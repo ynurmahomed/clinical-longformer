@@ -119,7 +119,8 @@ def set_token_length(input_df):
     Returns:
         pandas.Dataframe: Dataframe with number of tokens column
     """
-    return input_df.assign(LEN=input_df.TEXT.str.count(r"\w+"))
+    # Similar to len(str.split()) but str.count is vectorized so its faster
+    return input_df.assign(LEN=input_df.TEXT.str.count(r"\S+"))
 
 
 def preprocess1(x):
