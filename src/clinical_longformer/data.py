@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from pathlib import Path
+
 
 _logger = logging.getLogger(__name__)
 
@@ -162,7 +164,7 @@ def read_admissions(mimic_path):
     Returns:
         pandas.Dataframe: Admissions dataframe
     """
-    admissions = os.path.join(mimic_path, "ADMISSIONS.csv")
+    admissions = Path(mimic_path) / "ADMISSIONS.csv"
     columns = [
         "SUBJECT_ID",
         "HADM_ID",
@@ -194,7 +196,7 @@ def read_notes(mimic_path):
     Returns:
         pandas.Dataframe: Note events dataframe
     """
-    notes = os.path.join(mimic_path, "NOTEEVENTS.csv")
+    notes = Path(mimic_path) / "NOTEEVENTS.csv"
     columns = ["SUBJECT_ID", "HADM_ID", "CHARTDATE", "TEXT", "CATEGORY"]
     dtypes = {"CATEGORY": "category"}
     return pd.read_csv(
@@ -326,14 +328,14 @@ def split_admissions(df_adm, df_discharge, note_length, random_state=1):
     return discharge_train, discharge_val, discharge_test
 
 
-def process_notes(mimic_path, category, note_length):
+def process_notes(mimic_path, category, note_length, out_path):
     if category == "ds":
-        build_discharge_summary_dataset(mimic_path, note_length)
+        build_discharge_summary_dataset(mimic_path, note_length, out_path)
     else:
         pass
 
 
-def build_discharge_summary_dataset(mimic_path, note_length):
+def build_discharge_summary_dataset(mimic_path, note_length, out_path):
 
     _logger.info(f"mimic_path={mimic_path} length={note_length}")
 
@@ -352,6 +354,9 @@ def build_discharge_summary_dataset(mimic_path, note_length):
 
     train, valid, test = split_admissions(df_adm, df_discharge, note_length)
 
-    train.to_csv("./train.csv", index=False)
-    valid.to_csv("./valid.csv", index=False)
-    test.to_csv("./test.csv", index=False)
+    path = Path(".") / out_path / "discharge" / str(note_length)
+    path.mkdir(parents=True, exist_ok=True)
+
+    train.to_csv(path / "train.csv", index=False)
+    valid.to_csv(path / "valid.csv", index=False)
+    test.to_csv(path / "test.csv", index=False)

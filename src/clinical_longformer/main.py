@@ -1,6 +1,7 @@
 import argparse
 import logging
 import sys
+import os
 
 from clinical_longformer import __version__
 
@@ -16,7 +17,7 @@ _logger = logging.getLogger(__name__)
 # ---- Python API ----
 
 
-def dataset(mimic_path, category, note_length):
+def dataset(mimic_path, category, note_length, out_path):
     """Process dataset
 
     Args:
@@ -27,7 +28,7 @@ def dataset(mimic_path, category, note_length):
     Returns:
       str: MIMIC-III dataset location
     """
-    process_notes(mimic_path, category, note_length)
+    process_notes(mimic_path, category, note_length, out_path)
 
 
 # ---- CLI ----
@@ -61,6 +62,13 @@ def parse_args(args):
         help="set note length",
         type=int,
         choices=[512, 1000, 2000, 4000],
+    )
+    parser.add_argument(
+        dest="out_path",
+        help="set output path",
+        type=str,
+        nargs="?",
+        default=os.getcwd(),
     )
     parser.add_argument(
         "-v",
@@ -106,7 +114,7 @@ def main(args):
     args = parse_args(args)
     setup_logging(args.loglevel)
     _logger.info("Processing dataset...")
-    dataset(args.mimic_path, args.category, args.length)
+    dataset(args.mimic_path, args.category, args.length, args.out_path)
     _logger.info("Done processing.")
 
 
