@@ -102,7 +102,7 @@ def set_output_label(input_df):
     Returns:
         pandas.Dataframe: Dataframe with labeled admissions
     """
-    return input_df.assign(OUTPUT_LABEL=(input_df.DAYS_NEXT_ADMIT < 30).astype("int"))
+    return input_df.assign(LABEL=(input_df.DAYS_NEXT_ADMIT < 30).astype("int"))
 
 
 def set_duration(input_df):
@@ -208,34 +208,23 @@ def chunk_text(input_df, note_length):
     """Chunk dataframe `TEXT` column into equal parts with `note_length` size
 
     Args:
-        input_df (pandas.Dataframe): Dataframe with `HADM_ID`, `TEXT` and `OUTPUT_LABEL`
+        input_df (pandas.Dataframe): Dataframe with `HADM_ID`, `TEXT` and `LABEL`
         note_length (int): Size of the chunks
 
     Returns:
         pandas.Dataframe: Dataframe with chunked text
     """
-    chunked_df = pd.DataFrame({"ID": [], "TEXT": [], "LABEL": []})
-    for i in range(len(input_df)):
-        text = input_df.TEXT.iloc[i].split()
-        n = int(len(text) / note_length)
-        for j in range(n):
-            row = {
-                "TEXT": " ".join(text[j * note_length : (j + 1) * note_length]),
-                "LABEL": input_df.OUTPUT_LABEL.iloc[i],
-                "ID": input_df.HADM_ID.iloc[i],
-            }
-            chunked_df = chunked_df.append(row, ignore_index=True)
 
-        # Add remaining < note_length chunk
-        remain = len(text) % note_length
-        if remain > 10:
-            row = {
-                "TEXT": " ".join(text[-(remain):]),
-                "LABEL": input_df.OUTPUT_LABEL.iloc[i],
-                "ID": input_df.HADM_ID.iloc[i],
-            }
-            chunked_df = chunked_df.append(row, ignore_index=True)
+    def chunked(arr, size):
+        for i in range(0, len(arr), size):
+            yield arr[i : i + size]
 
+    chunked_df = input_df.loc[:, ["HADM_ID", "TEXT", "LABEL"]]
+    chunked_df.loc[:, "TEXT"] = chunked_df.TEXT.str.split()
+    chunked_df.loc[:, "TEXT"] = chunked_df.TEXT.apply(
+        lambda txt: [" ".join(c) for c in chunked(txt, note_length)]
+    )
+    chunked_df = chunked_df.explode("TEXT")
     return chunked_df
 
 
@@ -253,8 +242,8 @@ def split_admissions(df_adm, df_discharge, note_length, random_state=1):
     Returns:
         tuple: [description]
     """
-    readmit_ID = df_adm[df_adm.OUTPUT_LABEL == 1].HADM_ID
-    not_readmit_ID = df_adm[df_adm.OUTPUT_LABEL == 0].HADM_ID
+    readmit_ID = df_adm[df_adm.LABEL == 1].HADM_ID
+    not_readmit_ID = df_adm[df_adm.LABEL == 0].HADM_ID
 
     # Subsampling to get the balanced pos/neg numbers of patients for each dataset.
     positives = len(readmit_ID)
@@ -284,9 +273,9 @@ def split_admissions(df_adm, df_discharge, note_length, random_state=1):
     id_train = pd.concat([id_train_t, id_train_f])
     id_val = pd.concat([id_val_t, id_val_f])
     id_test = pd.concat([id_test_t, id_test_f])
-    discharge_train = df_discharge[df_discharge.ID.isin(id_train)]
-    discharge_val = df_discharge[df_discharge.ID.isin(id_val)]
-    discharge_test = df_discharge[df_discharge.ID.isin(id_test)]
+    discharge_train = df_discharge[df_discharge.HADM_ID.isin(id_train)]
+    discharge_val = df_discharge[df_discharge.HADM_ID.isin(id_val)]
+    discharge_test = df_discharge[df_discharge.HADM_ID.isin(id_test)]
 
     # Positive and negative examples might get unbalanced after chunking.
     # Positive usually have longer notes. Need to sample more negative examples.
@@ -304,13 +293,15 @@ def split_admissions(df_adm, df_discharge, note_length, random_state=1):
     # Sample remaining negative examples. The sum of the lengths must not
     # exceed diff * note_length. Wont get perfect balance between positive and
     # negative because of varying length of notes.
-    unused_chunks = df_discharge[df_discharge.ID.isin(unused)]
+    unused_chunks = df_discharge[df_discharge.HADM_ID.isin(unused)]
     unused_chunks = set_token_length(unused_chunks)
-    total_lengths = unused_chunks.groupby("ID").agg(totallen=("LEN", "sum"))
+    total_lengths = unused_chunks.groupby("HADM_ID").agg(totallen=("LEN", "sum"))
     total_lengths = total_lengths.sample(frac=1, random_state=random_state)
     cumsum = total_lengths.cumsum()
-    not_readmit_ID_more = cumsum[cumsum.totallen <= diff * note_length].reset_index().ID
-    remaining = df_discharge[df_discharge.ID.isin(not_readmit_ID_more)]
+    not_readmit_ID_more = (
+        cumsum[cumsum.totallen <= diff * note_length].reset_index().HADM_ID
+    )
+    remaining = df_discharge[df_discharge.HADM_ID.isin(not_readmit_ID_more)]
     discharge_train = pd.concat([remaining, discharge_train])
 
     # Shuffle.
