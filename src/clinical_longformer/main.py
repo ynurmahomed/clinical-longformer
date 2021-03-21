@@ -3,7 +3,8 @@ import logging
 import sys
 
 from clinical_longformer import __version__
-from .data import build_discharge_summary_dataset
+
+from .data import process_notes
 
 __author__ = "Yassin Nurmahomed"
 __copyright__ = "Yassin Nurmahomed"
@@ -26,7 +27,7 @@ def dataset(mimic_path, category, note_length):
     Returns:
       str: MIMIC-III dataset location
     """
-    return mimic_path, category, note_length
+    process_notes(mimic_path, category, note_length)
 
 
 # ---- CLI ----
@@ -48,20 +49,18 @@ def parse_args(args):
         action="version",
         version="clinical-longformer {ver}".format(ver=__version__),
     )
+    parser.add_argument(dest="mimic_path", help="MIMIC-III dataset path", type=str)
     parser.add_argument(
-        dest="mimic_path", help="MIMIC-III dataset path", type=str, metavar="MIMIC_PATH"
-    )
-    parser.add_argument(
-        "--category",
-        help="set notes category (ds - Discharge Summary, all)",
+        dest="category",
+        help="set notes category (ds - Discharge Summary)",
         type=str,
         choices=["ds", "all"],
     )
     parser.add_argument(
-        "--length",
+        dest="length",
         help="set note length",
         type=int,
-        choices=[2000, 4000],
+        choices=[512, 1000, 2000, 4000],
     )
     parser.add_argument(
         "-v",
@@ -106,12 +105,8 @@ def main(args):
     """
     args = parse_args(args)
     setup_logging(args.loglevel)
-    _logger.debug("Processing dataset...")
-    print(
-        "The MIMIC-III path is {}".format(
-            dataset(args.mimic_path, args.category, args.note_length)
-        )
-    )
+    _logger.info("Processing dataset...")
+    dataset(args.mimic_path, args.category, args.length)
     _logger.info("Done processing.")
 
 
