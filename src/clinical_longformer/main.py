@@ -61,7 +61,7 @@ def parse_args(args):
         dest="length",
         help="set note length",
         type=int,
-        choices=[512, 1000, 2000, 4000],
+        choices=[512, 1024, 2048, 4096],
     )
     parser.add_argument(
         dest="out_path",
