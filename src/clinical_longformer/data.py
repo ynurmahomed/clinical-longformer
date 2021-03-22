@@ -328,7 +328,7 @@ def process_notes(mimic_path, category, note_length, out_path):
 
 def build_discharge_summary_dataset(mimic_path, note_length, out_path):
 
-    _logger.debug(f"mimic_path={mimic_path} length={note_length}")
+    _logger.debug(f"mimic_path={mimic_path} length={note_length}, out={out_path}")
 
     df_adm = read_admissions(mimic_path)
     df_notes = read_notes(mimic_path)
