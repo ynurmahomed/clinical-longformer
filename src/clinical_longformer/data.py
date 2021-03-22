@@ -240,7 +240,7 @@ def split_admissions(df_adm, df_discharge, note_length, random_state=1):
         random_state (int, optional): Random state for sampling. Defaults to 1.
 
     Returns:
-        tuple: [description]
+        tuple: Dataframes for each train/validation/test split
     """
     readmit_ID = df_adm[df_adm.LABEL == 1].HADM_ID
     not_readmit_ID = df_adm[df_adm.LABEL == 0].HADM_ID
@@ -328,7 +328,7 @@ def process_notes(mimic_path, category, note_length, out_path):
 
 def build_discharge_summary_dataset(mimic_path, note_length, out_path):
 
-    _logger.info(f"mimic_path={mimic_path} length={note_length}")
+    _logger.debug(f"mimic_path={mimic_path} length={note_length}")
 
     df_adm = read_admissions(mimic_path)
     df_notes = read_notes(mimic_path)
