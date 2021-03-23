@@ -219,7 +219,7 @@ def chunk_text(input_df, note_length):
         for i in range(0, len(arr), size):
             yield arr[i : i + size]
 
-    chunked_df = input_df.loc[:, ["HADM_ID", "TEXT", "LABEL"]]
+    chunked_df = input_df
     chunked_df.loc[:, "TEXT"] = chunked_df.TEXT.str.split()
     chunked_df.loc[:, "TEXT"] = chunked_df.TEXT.apply(
         lambda txt: [" ".join(c) for c in chunked(txt, note_length)]
@@ -348,6 +348,7 @@ def build_discharge_summary_dataset(mimic_path, note_length, out_path):
     path = Path(".") / out_path / "discharge" / str(note_length)
     path.mkdir(parents=True, exist_ok=True)
 
-    train.to_csv(path / "train.csv", index=False)
-    valid.to_csv(path / "valid.csv", index=False)
-    test.to_csv(path / "test.csv", index=False)
+    columns = ["HADM_ID", "TEXT", "LABEL"]
+    train.to_csv(path / "train.csv", index=False, columns=columns)
+    valid.to_csv(path / "valid.csv", index=False, columns=columns)
+    test.to_csv(path / "test.csv", index=False, columns=columns)
