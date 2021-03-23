@@ -115,7 +115,7 @@ def set_duration(input_df):
         pandas.Dataframe: Dataframe with durations
     """
     diff = input_df.DISCHTIME - input_df.ADMITTIME
-    df = input_df.assign(DURATION=diff.dt.days)
+    df = input_df.assign(DURATION=diff)
     return df
 
 
