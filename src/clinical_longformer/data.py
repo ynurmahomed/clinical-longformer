@@ -228,34 +228,24 @@ def chunk_text(input_df, note_length):
     return chunked_df
 
 
-def split_admissions(df_adm, df_discharge, note_length, random_state=1):
-    """Split admissions into training, validation and test.
-
-    The training dataset will have balanced pos/neg examples.
+def get_admissions_split(readmitted, not_readmitted, random_state):
+    """Splits admissions into train, validation and test sets.
 
     Args:
-        df_adm (pandas.Dataframe): Admissions dataframe
-        df_discharge (pandas.Dataframe): Discharge dataframe
-        note_length (int): Size of the chunks
-        random_state (int, optional): Random state for sampling. Defaults to 1.
+        readmitted (pandas.Series): Admissions resulting in readmission.
+        not_readmitted (pandas.Series): Admissions not resulting in readmission.
+        random_state (int): Random state for sampling.
 
     Returns:
-        tuple: Dataframes for each train/validation/test split
+        tuple: Series for each train/validation/test set.
     """
-    readmit_ID = df_adm[df_adm.LABEL == 1].HADM_ID
-    not_readmit_ID = df_adm[df_adm.LABEL == 0].HADM_ID
-
-    # Subsampling to get the balanced pos/neg numbers of patients for each dataset.
-    positives = len(readmit_ID)
-    not_readmit_ID_use = not_readmit_ID.sample(n=positives, random_state=random_state)
-
     # Sample 20% for validation and testing.
-    id_val_test_t = readmit_ID.sample(frac=0.2, random_state=random_state)
-    id_val_test_f = not_readmit_ID_use.sample(frac=0.2, random_state=random_state)
+    id_val_test_t = readmitted.sample(frac=0.2, random_state=random_state)
+    id_val_test_f = not_readmitted.sample(frac=0.2, random_state=random_state)
 
     # Remove validation and testing set from training.
-    id_train_t = readmit_ID.drop(id_val_test_t.index)
-    id_train_f = not_readmit_ID_use.drop(id_val_test_f.index)
+    id_train_t = readmitted.drop(id_val_test_t.index)
+    id_train_f = not_readmitted.drop(id_val_test_f.index)
 
     # Sample 50% of validation + testing, use rest for test.
     id_val_t = id_val_test_t.sample(frac=0.5, random_state=random_state)
@@ -273,9 +263,80 @@ def split_admissions(df_adm, df_discharge, note_length, random_state=1):
     id_train = pd.concat([id_train_t, id_train_f])
     id_val = pd.concat([id_val_t, id_val_f])
     id_test = pd.concat([id_test_t, id_test_f])
-    discharge_train = df_discharge[df_discharge.HADM_ID.isin(id_train)]
-    discharge_val = df_discharge[df_discharge.HADM_ID.isin(id_val)]
-    discharge_test = df_discharge[df_discharge.HADM_ID.isin(id_test)]
+
+    return id_train, id_val, id_test
+
+
+def get_unused_admissions(all_adm, used):
+    """Unused admissions.
+
+    Args:
+        all_adm (pandas.Series): All admission ids.
+        used (pandas.Series): Admissions already used.
+
+    Returns:
+        Series: Unused admissions.
+    """
+    concat = pd.concat([used, all_adm])
+    unused = concat.drop_duplicates(keep=False)
+    intersection = pd.Index(unused).intersection(pd.Index(used))
+    assert len(intersection) == 0
+    return unused
+
+
+def get_remaining_chunks_to_balance(chunked, unused, note_length, diff, random_state):
+    """Returns additional chunks of notes needed to balance positive and negative
+    examples, considering to the `diff` parameter.
+
+    Args:
+        chunked (pandas.Dataframe): Chunked notes.
+        unused (pandas.Series): Admissions to draw additional chunks from.
+        note_length (int): Size of the chunks.
+        diff (int): Difference between positive and negative examples.
+        random_state (int): Random state for sampling.
+
+    Returns:
+        pandas.Dataframe: Additional chunks needed for balancing examples.
+    """
+    unused_chunks = chunked[chunked.HADM_ID.isin(unused)]
+    unused_chunks = set_token_length(unused_chunks)
+    total_lengths = unused_chunks.groupby("HADM_ID").agg(totallen=("LEN", "sum"))
+    total_lengths = total_lengths.sample(frac=1, random_state=random_state)
+    cumsum = total_lengths.cumsum()
+    not_readmit_ID_more = (
+        cumsum[cumsum.totallen <= diff * note_length].reset_index().HADM_ID
+    )
+    remaining = chunked[chunked.HADM_ID.isin(not_readmit_ID_more)]
+    return remaining
+
+
+def split_discharge_summaries(admissions, chunked, note_length, random_state=1):
+    """Split chunked discharge summaries into training, validation and test sets.
+
+    The training dataset will have balanced pos/neg examples.
+
+    Args:
+        admissions (pandas.Dataframe): Admissions dataframe
+        chunked (pandas.Dataframe): Dataframe with chunked text
+        note_length (int): Size of the chunks
+        random_state (int, optional): Random state for sampling. Defaults to 1.
+
+    Returns:
+        tuple: Dataframes for each train/validation/test split
+    """
+    readmit_ID = admissions[admissions.LABEL == 1].HADM_ID
+    not_readmit_ID = admissions[admissions.LABEL == 0].HADM_ID
+
+    # Subsampling to get the balanced pos/neg numbers of patients for each dataset.
+    positives = len(readmit_ID)
+    not_readmit_ID_use = not_readmit_ID.sample(n=positives, random_state=random_state)
+
+    id_train, id_val, id_test = get_admissions_split(
+        readmit_ID, not_readmit_ID_use, random_state
+    )
+    discharge_train = chunked[chunked.HADM_ID.isin(id_train)]
+    discharge_val = chunked[chunked.HADM_ID.isin(id_val)]
+    discharge_test = chunked[chunked.HADM_ID.isin(id_test)]
 
     # Positive and negative examples might get unbalanced after chunking.
     # Positive usually have longer notes. Need to sample more negative examples.
@@ -285,23 +346,14 @@ def split_admissions(df_adm, df_discharge, note_length, random_state=1):
     assert diff > 0
 
     # Discard already used examples.
-    concat = pd.concat([not_readmit_ID_use, not_readmit_ID])
-    unused = concat.drop_duplicates(keep=False)
-    intersection = pd.Index(unused).intersection(pd.Index(not_readmit_ID_use))
-    assert len(intersection) == 0
+    unused = get_unused_admissions(not_readmit_ID, not_readmit_ID_use)
 
     # Sample remaining negative examples. The sum of the lengths must not
     # exceed diff * note_length. Wont get perfect balance between positive and
     # negative because of varying length of notes.
-    unused_chunks = df_discharge[df_discharge.HADM_ID.isin(unused)]
-    unused_chunks = set_token_length(unused_chunks)
-    total_lengths = unused_chunks.groupby("HADM_ID").agg(totallen=("LEN", "sum"))
-    total_lengths = total_lengths.sample(frac=1, random_state=random_state)
-    cumsum = total_lengths.cumsum()
-    not_readmit_ID_more = (
-        cumsum[cumsum.totallen <= diff * note_length].reset_index().HADM_ID
+    remaining = get_remaining_chunks_to_balance(
+        chunked, unused, note_length, diff, random_state
     )
-    remaining = df_discharge[df_discharge.HADM_ID.isin(not_readmit_ID_more)]
     discharge_train = pd.concat([remaining, discharge_train])
 
     # Shuffle.
@@ -343,7 +395,7 @@ def build_discharge_summary_dataset(mimic_path, note_length, out_path):
     df_discharge = df_discharge[df_discharge["TEXT"].notnull()]
     df_discharge = df_discharge.pipe(preprocessing).pipe(chunk_text, note_length)
 
-    train, valid, test = split_admissions(df_adm, df_discharge, note_length)
+    train, valid, test = split_discharge_summaries(df_adm, df_discharge, note_length)
 
     path = Path(".") / out_path / "discharge" / str(note_length)
     path.mkdir(parents=True, exist_ok=True)
