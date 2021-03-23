@@ -371,11 +371,84 @@ def split_discharge_summaries(admissions, chunked, note_length, random_state=1):
     return discharge_train, discharge_val, discharge_test
 
 
-def process_notes(mimic_path, category, note_length, out_path):
+def split_all_notes(admissions, chunked, n_days, note_length, random_state=1):
+    """Split chunked notes into training, validation and test sets.
+
+    The training dataset will have balanced pos/neg examples.
+
+    Args:
+        admissions (pandas.Dataframe): Admissions dataframe
+        chunked (pandas.Dataframe): Dataframe with chunked text
+        n_days(int): Number of days of notes to collect.
+        note_length (int): Size of the chunks
+        random_state (int, optional): Random state for sampling. Defaults to 1.
+
+    Returns:
+        tuple: Dataframes for each train/validation/test split.
+    """
+    readmit_ID = admissions[admissions.LABEL == 1].HADM_ID
+    not_readmit_ID = admissions[admissions.LABEL == 0].HADM_ID
+
+    # Subsampling to get the balanced pos/neg numbers of patients for each dataset.
+    positives = len(readmit_ID)
+    not_readmit_ID_use = not_readmit_ID.sample(n=positives, random_state=random_state)
+
+    id_train, id_val, id_test = get_admissions_split(
+        readmit_ID, not_readmit_ID_use, random_state
+    )
+    all_notes_train = chunked[chunked.HADM_ID.isin(id_train)]
+    all_notes_val = chunked[chunked.HADM_ID.isin(id_val)]
+
+    # We want to test on admissions that are not discharged already, so we
+    # filter out admissions discharged within n_days. Since each set of < n_days
+    # is a subset of the n_days set, we only need to train on n_days to be able
+    # make predictions on < n_days. No need for train and validation sets for < n_days.
+    all_notes_test = []
+    for i in reversed(range(1, n_days + 1)):
+        time_delta = pd.Timedelta(i, "days")
+        actionable = admissions[admissions["DURATION"] >= time_delta].HADM_ID
+        id_test_actionable = id_test[id_test.isin(actionable)]
+        test_set = chunked[chunked.HADM_ID.isin(id_test_actionable)]
+        all_notes_test.append(test_set)
+
+    # Positive and negative examples might get unbalanced after chunking.
+    # Positive usually have longer notes. Need to sample more negative examples.
+    positive = len(all_notes_train[all_notes_train.LABEL == 1])
+    negative = len(all_notes_train[all_notes_train.LABEL == 0])
+    diff = positive - negative
+    assert diff > 0
+
+    # Discard already used examples.
+    unused = get_unused_admissions(not_readmit_ID, not_readmit_ID_use)
+
+    # Sample remaining negative examples. The sum of the lengths must not
+    # exceed diff * note_length. Wont get perfect balance between positive and
+    # negative because of varying length of notes.
+    remaining = get_remaining_chunks_to_balance(
+        chunked, unused, note_length, diff, random_state
+    )
+    all_notes_train = pd.concat([remaining, all_notes_train])
+
+    # Shuffle.
+    all_notes_train = all_notes_train.sample(frac=1, random_state=random_state)
+    all_notes_train = all_notes_train.reset_index(drop=True)
+
+    positive = len(all_notes_train[all_notes_train.LABEL == 1])
+    negative = len(all_notes_train[all_notes_train.LABEL == 0])
+    readmit = positive / len(all_notes_train)
+    not_readmit = negative / len(all_notes_train)
+    _logger.info(
+        f"readmitted={readmit*100:,.0f}% not_readmitted={not_readmit*100:,.0f}%"
+    )
+
+    return all_notes_train, all_notes_val, all_notes_test
+
+
+def process_notes(mimic_path, category, note_length, n_days, out_path):
     if category == "ds":
         build_discharge_summary_dataset(mimic_path, note_length, out_path)
     else:
-        pass
+        build_all_notes_dataset(mimic_path, note_length, n_days, out_path)
 
 
 def build_discharge_summary_dataset(mimic_path, note_length, out_path):
@@ -404,3 +477,36 @@ def build_discharge_summary_dataset(mimic_path, note_length, out_path):
     train.to_csv(path / "train.csv", index=False, columns=columns)
     valid.to_csv(path / "valid.csv", index=False, columns=columns)
     test.to_csv(path / "test.csv", index=False, columns=columns)
+
+
+def build_all_notes_dataset(mimic_path, note_length, n_days, out_path):
+
+    _logger.debug(
+        f"mimic_path={mimic_path} length={note_length} days={n_days} out={out_path}"
+    )
+
+    df_adm = read_admissions(mimic_path)
+    df_notes = read_notes(mimic_path)
+    df_adm_notes = pd.merge(df_adm, df_notes, on=["SUBJECT_ID", "HADM_ID"], how="left")
+
+    chartdate = df_adm_notes.CHARTDATE.dt.date
+    admittime = df_adm_notes.ADMITTIME.dt.date
+    less_n_days = chartdate - admittime < pd.Timedelta(n_days, "days")
+    df_n_days = df_adm_notes[less_n_days]
+    df_n_days = df_n_days[df_n_days.TEXT.notnull()]
+    df_n_days = df_n_days.pipe(preprocessing).pipe(chunk_text, note_length)
+
+    train, valid, test = split_all_notes(df_adm, df_n_days, n_days, note_length)
+
+    base = Path(".") / out_path / "all" / str(note_length)
+    path = base / f"{n_days}days"
+    path.mkdir(parents=True, exist_ok=True)
+
+    columns = ["HADM_ID", "TEXT", "LABEL"]
+    train.to_csv(path / "train.csv", index=False, columns=columns)
+    valid.to_csv(path / "valid.csv", index=False, columns=columns)
+
+    for i in reversed(range(len(test))):
+        path = base / f"{n_days - i}days"
+        path.mkdir(parents=True, exist_ok=True)
+        test[i].to_csv(path / "test.csv", index=False, columns=columns)

@@ -17,18 +17,19 @@ _logger = logging.getLogger(__name__)
 # ---- Python API ----
 
 
-def dataset(mimic_path, category, note_length, out_path):
+def dataset(mimic_path, category, note_length, n_days, out_path):
     """Process dataset
 
     Args:
       mimic_path (str): MIMIC-III dataset location
       category (str): Clinical notes category
       note_length (int): Note length
+      n_days (int): Number of days of notes to consider.
 
     Returns:
       str: MIMIC-III dataset location
     """
-    process_notes(mimic_path, category, note_length, out_path)
+    process_notes(mimic_path, category, note_length, n_days, out_path)
 
 
 # ---- CLI ----
@@ -44,7 +45,7 @@ def parse_args(args):
     Returns:
       :obj:`argparse.Namespace`: command line parameters namespace
     """
-    parser = argparse.ArgumentParser(description="Clinical Longformer")
+    parser = argparse.ArgumentParser(description="Clinical Longformer data processing")
     parser.add_argument(
         "--version",
         action="version",
@@ -69,6 +70,15 @@ def parse_args(args):
         type=str,
         nargs="?",
         default=os.getcwd(),
+    )
+    parser.add_argument(
+        "--n-days",
+        dest="n_days",
+        help="set number of days (only used if category is set to all)",
+        type=int,
+        choices=list(range(1, 31)),
+        metavar='{1-30}',
+        default=3,
     )
     parser.add_argument(
         "-v",
@@ -114,7 +124,7 @@ def main(args):
     args = parse_args(args)
     setup_logging(args.loglevel)
     _logger.info("Processing dataset...")
-    dataset(args.mimic_path, args.category, args.length, args.out_path)
+    dataset(args.mimic_path, args.category, args.length, args.n_days, args.out_path)
     _logger.info("Done processing.")
 
 
