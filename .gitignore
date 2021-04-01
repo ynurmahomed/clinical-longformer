@@ -53,3 +53,10 @@ venv*/
 .conda*/
 
 *.csv
+
+# Torchtext
+.vector_cache
+.data
+
+# Pytorch lightning
+lightning_logs
