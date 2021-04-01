@@ -5,7 +5,7 @@ import os
 
 from clinical_longformer import __version__
 
-from .data import process_notes
+from .data.processing import process_notes
 
 __author__ = "Yassin Nurmahomed"
 __copyright__ = "Yassin Nurmahomed"
