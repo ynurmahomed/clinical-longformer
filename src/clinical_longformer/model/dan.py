@@ -25,14 +25,14 @@ Returns:
 
 class DAN(pl.LightningModule):
     def __init__(
-        self, vectors, vocab, embed_dim, label_vocab, lr=LEARNING_RATE, loss=F.nll_loss
+        self, vectors, vocab, embed_dim, labels, lr=LEARNING_RATE, loss=F.nll_loss
     ):
 
         super().__init__()
 
-        num_class = len(label_vocab)
+        self.labels = labels
 
-        self.label_vocab = label_vocab
+        num_class = len(labels)
 
         self.lr = lr
 
@@ -45,7 +45,9 @@ class DAN(pl.LightningModule):
             self.embedding = nn.EmbeddingBag(len(vocab), embed_dim)
 
         self.ff = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim), nn.ReLU(), nn.Linear(embed_dim, num_class)
+            nn.Linear(embed_dim, embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim, num_class),
         )
 
         self.log_softmax = nn.LogSoftmax(dim=1)
@@ -125,10 +127,8 @@ class DAN(pl.LightningModule):
 
         self.confmat(preds, y)
 
-        labels = self.label_vocab.itos
-
         cm_df = pd.DataFrame(
-            self.confmat.compute().numpy(), index=labels, columns=labels
+            self.confmat.compute().numpy(), index=self.labels, columns=self.labels
         )
 
         plt.figure(figsize=(10, 7))
@@ -182,7 +182,7 @@ def main(args):
     else:
         vectors = GloVe(name="6B", dim=EMBED_DIM)
 
-    model = DAN(vectors, dm.vocab, EMBED_DIM, dm.label_vocab)
+    model = DAN(vectors, dm.vocab, EMBED_DIM, dm.labels)
 
     trainer = pl.Trainer.from_argparse_args(args)
 
