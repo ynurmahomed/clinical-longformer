@@ -24,7 +24,9 @@ Returns:
 
 
 class DAN(pl.LightningModule):
-    def __init__(self, vectors, vocab, embed_dim, label_vocab, lr=LEARNING_RATE):
+    def __init__(
+        self, vectors, vocab, embed_dim, label_vocab, lr=LEARNING_RATE, loss=F.nll_loss
+    ):
 
         super().__init__()
 
@@ -33,6 +35,8 @@ class DAN(pl.LightningModule):
         self.label_vocab = label_vocab
 
         self.lr = lr
+
+        self.loss = loss
 
         if vectors is not None:
             pre_trained = vectors(vocab.itos)
@@ -68,7 +72,7 @@ class DAN(pl.LightningModule):
 
         preds = self(x, offsets)
 
-        loss = F.nll_loss(preds, y)
+        loss = self.loss(preds, y)
 
         self.train_f1(preds, y)
 
@@ -86,7 +90,7 @@ class DAN(pl.LightningModule):
 
         preds = self(x, offsets)
 
-        loss = F.nll_loss(preds, y)
+        loss = self.loss(preds, y)
 
         self.valid_f1(preds, y)
 
