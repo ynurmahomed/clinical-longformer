@@ -27,7 +27,7 @@ Returns:
 
 class DAN(pl.LightningModule):
     def __init__(
-        self, vectors, vocab, embed_dim, labels, lr=LEARNING_RATE, loss=F.nll_loss
+        self, vectors, vocab, embed_dim, labels, lr=LEARNING_RATE, loss=F.cross_entropy
     ):
 
         super().__init__()
@@ -46,13 +46,13 @@ class DAN(pl.LightningModule):
         else:
             self.embedding = nn.EmbeddingBag(len(vocab), embed_dim)
 
-        self.ff = nn.Sequential(
+        self.feed_forward = nn.Sequential(
             nn.Linear(embed_dim, embed_dim),
             nn.ReLU(),
             nn.Linear(embed_dim, num_class),
         )
 
-        self.log_softmax = nn.LogSoftmax(dim=1)
+        self.softmax = nn.Softmax(dim=1)
 
         auc = torchmetrics.AUC(reorder=True)
 
@@ -70,11 +70,11 @@ class DAN(pl.LightningModule):
 
         embedded = self.embedding(x, offsets)
 
-        ff = self.ff(embedded)
+        ff = self.feed_forward(embedded)
 
-        log_softmax = self.log_softmax(ff)
+        softmax = self.softmax(ff)
 
-        return log_softmax
+        return softmax
 
     def training_step(self, batch, batch_idx):
 
