@@ -11,7 +11,11 @@ from torchtext.experimental.datasets.text_classification import (
     build_vocab,
     TextClassificationDataset,
 )
-from torchtext.experimental.functional import sequential_transforms, vocab_func
+from torchtext.experimental.functional import (
+    sequential_transforms,
+    vocab_func,
+    totensor,
+)
 from torchtext.experimental.transforms import basic_english_normalize
 from torchtext.vocab import Vocab
 
@@ -19,17 +23,23 @@ NUM_WORKERS = 4
 DATA_PATH = Path("/home/yassin/Projects/AI/Project/tedtalks")
 
 
-def get_collate_batch(label_transform, text_transform):
+def get_collate_fn(label_transform=None, text_transform=None):
     def func(batch):
 
         label_list, text_list, offsets = [], [], [0]
 
         for (_label, _text) in batch:
 
-            label_list.append(label_transform(_label))
-            processed_text = text_transform(_text)
+            processed_label = _label
+            if label_transform:
+                processed_label = label_transform(_label)
+            label_list.append(processed_label)
 
+            processed_text = _text
+            if text_transform:
+                processed_text = text_transform(_text)
             text_list.append(processed_text)
+
             offsets.append(processed_text.size(0))
 
         return (
@@ -39,6 +49,80 @@ def get_collate_batch(label_transform, text_transform):
         )
 
     return func
+
+
+class MIMICIIIDataModule(pl.LightningDataModule):
+    def __init__(self, path, note_length, batch_size):
+
+        super().__init__()
+
+        self.path = path
+        self.note_length = note_length
+        self.vocab = None
+        self.label_vocab = None
+        self.batch_size = batch_size
+
+    def setup(self):
+
+        columns = ["LABEL", "TEXT"]
+
+        self.labels = ["Not Readmitted", "Readmitted"]
+
+        train = pd.read_csv(self.path / str(self.note_length) / "train.csv")
+        valid = pd.read_csv(self.path / str(self.note_length) / "valid.csv")
+        test = pd.read_csv(self.path / str(self.note_length) / "test.csv")
+
+        train_data = self.get_tuples(train[columns])
+        valid_data = self.get_tuples(valid[columns])
+        test_data = self.get_tuples(test[columns])
+
+        tokenizer = basic_english_normalize()
+        data = self.get_tuples(train[columns])
+        self.vocab = build_vocab(data, tokenizer)
+
+        token_transform = sequential_transforms(
+            tokenizer, vocab_func(self.vocab), totensor(torch.long)
+        )
+
+        label_transform = totensor(torch.long)
+
+        transforms = (label_transform, token_transform)
+
+        self.train = TextClassificationDataset(train_data, self.vocab, transforms)
+
+        self.valid = TextClassificationDataset(valid_data, self.vocab, transforms)
+
+        self.test = TextClassificationDataset(test_data, self.vocab, transforms)
+
+    def get_tuples(
+        self,
+        dataframe,
+    ):
+        return list(dataframe.itertuples(index=False))
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train,
+            batch_size=self.batch_size,
+            collate_fn=get_collate_fn(),
+            num_workers=NUM_WORKERS,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.valid,
+            batch_size=self.batch_size,
+            collate_fn=get_collate_fn(),
+            num_workers=NUM_WORKERS,
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test,
+            batch_size=self.batch_size,
+            collate_fn=get_collate_fn(),
+            num_workers=NUM_WORKERS,
+        )
 
 
 class AGNNewsDataModule(pl.LightningDataModule):
@@ -65,7 +149,7 @@ class AGNNewsDataModule(pl.LightningDataModule):
         self.text_transform = lambda t: t
 
     def train_dataloader(self):
-        collate_fn = get_collate_batch(self.label_transform, self.text_transform)
+        collate_fn = get_collate_fn(self.label_transform, self.text_transform)
         return DataLoader(
             self.train,
             batch_size=self.batch_size,
@@ -74,7 +158,7 @@ class AGNNewsDataModule(pl.LightningDataModule):
         )
 
     def val_dataloader(self):
-        collate_fn = get_collate_batch(self.label_transform, self.text_transform)
+        collate_fn = get_collate_fn(self.label_transform, self.text_transform)
         return DataLoader(
             self.valid,
             batch_size=self.batch_size,
@@ -83,7 +167,7 @@ class AGNNewsDataModule(pl.LightningDataModule):
         )
 
     def test_dataloader(self):
-        collate_fn = get_collate_batch(self.label_transform, self.text_transform)
+        collate_fn = get_collate_fn(self.label_transform, self.text_transform)
         return DataLoader(
             self.test,
             batch_size=self.batch_size,

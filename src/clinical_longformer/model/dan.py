@@ -4,13 +4,15 @@ import pytorch_lightning as pl
 import seaborn as sns
 import sys
 import torch
+import torchmetrics
 import torch.nn as nn
 import torch.nn.functional as F
 
 from argparse import ArgumentParser
+from pathlib import Path
 from torchtext.experimental.vectors import GloVe
 
-from ..data.module import AGNNewsDataModule
+from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
 
 BATCH_SIZE = 50
 EMBED_DIM = 300
@@ -52,11 +54,15 @@ class DAN(pl.LightningModule):
 
         self.log_softmax = nn.LogSoftmax(dim=1)
 
-        self.train_f1 = pl.metrics.F1(num_class, average="weighted")
-        self.valid_f1 = pl.metrics.F1(num_class, average="weighted")
-        self.test_f1 = pl.metrics.F1(num_class, average="weighted")
+        auc = torchmetrics.AUC(reorder=True)
+        self.train_auc = auc.clone()
+        self.valid_auc = auc.clone()
+        self.test_auc = auc.clone()
 
-        self.confmat = pl.metrics.ConfusionMatrix(num_class, normalize="true")
+        pr_curve = torchmetrics.PrecisionRecallCurve()
+        self.test_pr_curve = pr_curve.clone()
+
+        self.confmat = torchmetrics.ConfusionMatrix(num_class, normalize="true")
 
     def forward(self, x, offsets):
 
@@ -76,10 +82,10 @@ class DAN(pl.LightningModule):
 
         loss = self.loss(preds, y)
 
-        self.train_f1(preds, y)
+        self.train_auc(preds.argmax(1), y)
 
         self.log(
-            "F1Score/train", self.train_f1, on_step=False, on_epoch=True, prog_bar=True
+            "AUC/train", self.train_auc, on_step=False, on_epoch=True, prog_bar=True
         )
 
         self.log("Loss/train", loss, on_step=False, on_epoch=True, prog_bar=False)
@@ -94,9 +100,9 @@ class DAN(pl.LightningModule):
 
         loss = self.loss(preds, y)
 
-        self.valid_f1(preds, y)
+        self.valid_auc(preds.argmax(1), y)
 
-        self.log("F1Score/valid", self.valid_f1, on_epoch=True, prog_bar=True)
+        self.log("AUC/valid", self.valid_auc, on_epoch=True, prog_bar=True)
 
         self.log("Loss/valid", loss, on_step=False, on_epoch=True, prog_bar=False)
 
@@ -115,13 +121,27 @@ class DAN(pl.LightningModule):
         y = torch.cat([o["y"] for o in outputs])
 
         preds = torch.cat([o["preds"] for o in outputs])
-        preds = torch.argmax(preds, dim=1)
+        preds = preds.argmax(1)
 
-        f1 = self.test_f1(preds, y)
+        auc = self.test_auc(preds, y)
+
+        self.log_pr_curve(preds, y)
 
         self.log_confusion_matrix(preds, y)
 
-        self.log("F1Score/test", f1)
+        self.log("AUC/test", auc)
+
+    def log_pr_curve(self, preds, y):
+
+        precision, recall, thresholds = self.test_pr_curve(preds, y)
+
+        plt.figure(figsize=(10, 7))
+        fig = sns.lineplot(x=recall.numpy(), y=precision.numpy()).get_figure()
+        plt.close(fig)
+
+        self.logger.experiment.add_figure(
+            "PR Curve/Test", fig, self.current_epoch
+        )
 
     def log_confusion_matrix(self, preds, y):
 
@@ -148,7 +168,9 @@ class DAN(pl.LightningModule):
 
 
 def get_data_module():
-    dm = AGNNewsDataModule(BATCH_SIZE)
+    p = Path("/home/yassin/Projects/Masters/code/discharge")
+    note_length = 512
+    dm = MIMICIIIDataModule(p, note_length, BATCH_SIZE)
     dm.setup()
     return dm
 
