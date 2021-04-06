@@ -55,11 +55,13 @@ class DAN(pl.LightningModule):
         self.log_softmax = nn.LogSoftmax(dim=1)
 
         auc = torchmetrics.AUC(reorder=True)
+
         self.train_auc = auc.clone()
         self.valid_auc = auc.clone()
         self.test_auc = auc.clone()
 
-        pr_curve = torchmetrics.PrecisionRecallCurve()
+        pr_curve = torchmetrics.PrecisionRecallCurve(pos_label=1)
+
         self.test_pr_curve = pr_curve.clone()
 
         self.confmat = torchmetrics.ConfusionMatrix(num_class, normalize="true")
@@ -82,13 +84,17 @@ class DAN(pl.LightningModule):
 
         loss = self.loss(preds, y)
 
-        self.train_auc(preds.argmax(1), y)
+        return {"loss": loss, "preds": preds, "target": y}
 
-        self.log(
-            "AUC/train", self.train_auc, on_step=False, on_epoch=True, prog_bar=True
-        )
+    def training_step_end(self, outputs):
 
-        self.log("Loss/train", loss, on_step=False, on_epoch=True, prog_bar=False)
+        loss = outputs["loss"]
+
+        self.train_auc(outputs["preds"].argmax(1), outputs["target"])
+
+        self.log("AUC/train", self.train_auc)
+
+        self.log("Loss/train", loss)
 
         return loss
 
@@ -100,11 +106,17 @@ class DAN(pl.LightningModule):
 
         loss = self.loss(preds, y)
 
-        self.valid_auc(preds.argmax(1), y)
+        return {"loss": loss, "preds": preds, "target": y}
 
-        self.log("AUC/valid", self.valid_auc, on_epoch=True, prog_bar=True)
+    def validation_step_end(self, outputs):
 
-        self.log("Loss/valid", loss, on_step=False, on_epoch=True, prog_bar=False)
+        loss = outputs["loss"]
+
+        self.valid_auc(outputs["preds"].argmax(1), outputs["target"])
+
+        self.log("AUC/valid", self.valid_auc)
+
+        self.log("Loss/valid", loss)
 
         return loss
 
@@ -114,11 +126,11 @@ class DAN(pl.LightningModule):
 
         preds = self(x, offsets)
 
-        return {"preds": preds, "y": y}
+        return {"preds": preds, "target": y}
 
     def test_epoch_end(self, outputs):
 
-        y = torch.cat([o["y"] for o in outputs])
+        y = torch.cat([o["target"] for o in outputs])
 
         preds = torch.cat([o["preds"] for o in outputs])
         preds = preds.argmax(1)
@@ -139,9 +151,7 @@ class DAN(pl.LightningModule):
         fig = sns.lineplot(x=recall.numpy(), y=precision.numpy()).get_figure()
         plt.close(fig)
 
-        self.logger.experiment.add_figure(
-            "PR Curve/Test", fig, self.current_epoch
-        )
+        self.logger.experiment.add_figure("PR Curve/Test", fig, self.current_epoch)
 
     def log_confusion_matrix(self, preds, y):
 
