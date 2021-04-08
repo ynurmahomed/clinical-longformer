@@ -148,10 +148,18 @@ class DAN(pl.LightningModule):
 
         precision, recall, _ = self.test_pr_curve(preds, y)
 
+        fig = self.get_pr_curve(precision, recall)
+
         auc_pr = get_macro_auc_pr(precision, recall)
+
         self.log("AUC-PR (macro)/test", auc_pr)
 
+        self.logger.experiment.add_figure("PR Curve/Test", fig, self.current_epoch)
+
+    def get_pr_curve(self, precision, recall):
+
         pr_per_class = []
+
         for i, l in enumerate(self.labels):
             d = {"Precision": precision[i], "Recall": recall[i], "Label": l}
             df = pd.DataFrame(d)
@@ -160,16 +168,19 @@ class DAN(pl.LightningModule):
         pr = pd.concat(pr_per_class)
 
         plt.figure(figsize=(10, 7))
+
         ax = sns.lineplot(data=pr, x="Recall", y="Precision", hue="Label")
+
         h, l = ax.get_legend_handles_labels()
         legend_labels = [
             f"{c} (AUC {auc(recall[i], precision[i]):.2f})" for i, c in enumerate(l)
         ]
         ax.legend(h, legend_labels)
+
         fig = ax.get_figure()
         plt.close(fig)
 
-        self.logger.experiment.add_figure("PR Curve/Test", fig, self.current_epoch)
+        return fig
 
     def log_confusion_matrix(self, preds, y):
 
