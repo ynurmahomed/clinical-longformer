@@ -60,7 +60,7 @@ class DAN(pl.LightningModule):
         self.valid_auc = auc.clone()
         self.test_auc = auc.clone()
 
-        pr_curve = torchmetrics.PrecisionRecallCurve(pos_label=1)
+        pr_curve = torchmetrics.PrecisionRecallCurve(num_class)
 
         self.test_pr_curve = pr_curve.clone()
 
@@ -133,13 +133,12 @@ class DAN(pl.LightningModule):
         y = torch.cat([o["target"] for o in outputs])
 
         preds = torch.cat([o["preds"] for o in outputs])
-        preds = preds.argmax(1)
 
-        auc = self.test_auc(preds, y)
+        auc = self.test_auc(preds.argmax(1), y)
 
         self.log_pr_curve(preds, y)
 
-        self.log_confusion_matrix(preds, y)
+        self.log_confusion_matrix(preds.argmax(1), y)
 
         self.log("AUC/test", auc)
 
@@ -147,8 +146,16 @@ class DAN(pl.LightningModule):
 
         precision, recall, thresholds = self.test_pr_curve(preds, y)
 
+        pr_per_class = []
+        for i, l in enumerate(self.labels):
+            d = {"Precision": precision[i], "Recall": recall[i], "Label": l}
+            df = pd.DataFrame(d)
+            pr_per_class.append(df)
+
+        pr = pd.concat(pr_per_class)
+
         plt.figure(figsize=(10, 7))
-        fig = sns.lineplot(x=recall.numpy(), y=precision.numpy()).get_figure()
+        fig = sns.lineplot(data=pr, x="Recall", y="Precision", hue="Label").get_figure()
         plt.close(fig)
 
         self.logger.experiment.add_figure("PR Curve/Test", fig, self.current_epoch)
@@ -222,7 +229,7 @@ def main(args):
 
     trainer.fit(model, datamodule=dm)
 
-    trainer.test(ckpt_path=None, datamodule=dm)
+    trainer.test(model, ckpt_path=None, datamodule=dm)
 
 
 def run():
