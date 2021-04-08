@@ -10,6 +10,7 @@ import torch.nn.functional as F
 
 from argparse import ArgumentParser
 from pathlib import Path
+from torchmetrics.functional import auc
 from torchtext.experimental.vectors import GloVe
 
 from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
@@ -18,14 +19,18 @@ BATCH_SIZE = 50
 EMBED_DIM = 300
 LEARNING_RATE = 0.01
 
-"""Deep averaging network.
 
-Returns:
-    DAN: Deep averaging network.
-"""
+def get_macro_auc_pr(precision, recall):
+    return torch.tensor([auc(r, p) for r, p in zip(recall, precision)]).mean()
 
 
 class DAN(pl.LightningModule):
+    """Deep averaging network.
+
+    Returns:
+        DAN: Deep averaging network.
+    """
+
     def __init__(
         self, vectors, vocab, embed_dim, labels, lr=LEARNING_RATE, loss=F.cross_entropy
     ):
@@ -54,14 +59,10 @@ class DAN(pl.LightningModule):
 
         self.softmax = nn.Softmax(dim=1)
 
-        ap = torchmetrics.AveragePrecision(num_class)
-
-        self.train_ap = ap.clone()
-        self.valid_ap = ap.clone()
-        self.test_ap = ap.clone()
-
         pr_curve = torchmetrics.PrecisionRecallCurve(num_class)
 
+        self.train_pr_curve = pr_curve.clone()
+        self.valid_pr_curve = pr_curve.clone()
         self.test_pr_curve = pr_curve.clone()
 
         self.confmat = torchmetrics.ConfusionMatrix(num_class, normalize="true")
@@ -90,9 +91,11 @@ class DAN(pl.LightningModule):
 
         loss = outputs["loss"]
 
-        self.train_ap(outputs["preds"].argmax(1), outputs["target"])
+        precision, recall, _ = self.train_pr_curve(outputs["preds"], outputs["target"])
 
-        self.log("Average Precision/train", self.train_ap)
+        auc_pr = get_macro_auc_pr(precision, recall)
+
+        self.log("AUC-PR (macro)/train", auc_pr)
 
         self.log("Loss/train", loss)
 
@@ -112,9 +115,11 @@ class DAN(pl.LightningModule):
 
         loss = outputs["loss"]
 
-        self.valid_ap(outputs["preds"].argmax(1), outputs["target"])
+        precision, recall, _ = self.valid_pr_curve(outputs["preds"], outputs["target"])
 
-        self.log("Average Precision/valid", self.valid_ap)
+        auc_pr = get_macro_auc_pr(precision, recall)
+
+        self.log("AUC-PR (macro)/valid", auc_pr)
 
         self.log("Loss/valid", loss)
 
@@ -134,17 +139,16 @@ class DAN(pl.LightningModule):
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        ap = self.test_ap(preds.argmax(1), y)
-
         self.log_pr_curve(preds, y)
 
         self.log_confusion_matrix(preds.argmax(1), y)
 
-        self.log("Average Precision/test", ap)
-
     def log_pr_curve(self, preds, y):
 
-        precision, recall, thresholds = self.test_pr_curve(preds, y)
+        precision, recall, _ = self.test_pr_curve(preds, y)
+
+        auc_pr = get_macro_auc_pr(precision, recall)
+        self.log("AUC-PR (macro)/test", auc_pr)
 
         pr_per_class = []
         for i, l in enumerate(self.labels):
@@ -155,7 +159,13 @@ class DAN(pl.LightningModule):
         pr = pd.concat(pr_per_class)
 
         plt.figure(figsize=(10, 7))
-        fig = sns.lineplot(data=pr, x="Recall", y="Precision", hue="Label").get_figure()
+        ax = sns.lineplot(data=pr, x="Recall", y="Precision", hue="Label")
+        h, l = ax.get_legend_handles_labels()
+        legend_labels = [
+            f"{c} (AUC {auc(recall[i], precision[i]):.2f})" for i, c in enumerate(l)
+        ]
+        ax.legend(h, legend_labels)
+        fig = ax.get_figure()
         plt.close(fig)
 
         self.logger.experiment.add_figure("PR Curve/Test", fig, self.current_epoch)
