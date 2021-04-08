@@ -15,6 +15,7 @@ from torchtext.experimental.vectors import GloVe
 
 from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
 
+
 BATCH_SIZE = 50
 EMBED_DIM = 300
 LEARNING_RATE = 0.01
@@ -243,6 +244,8 @@ def main(args):
 
 
 def run():
+    # https://github.com/pytorch/pytorch/issues/11201
+    torch.multiprocessing.set_sharing_strategy("file_system")
     main(sys.argv[1:])
 
 
