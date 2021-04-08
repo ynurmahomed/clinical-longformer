@@ -54,11 +54,11 @@ class DAN(pl.LightningModule):
 
         self.softmax = nn.Softmax(dim=1)
 
-        auc = torchmetrics.AUC(reorder=True)
+        ap = torchmetrics.AveragePrecision(num_class)
 
-        self.train_auc = auc.clone()
-        self.valid_auc = auc.clone()
-        self.test_auc = auc.clone()
+        self.train_ap = ap.clone()
+        self.valid_ap = ap.clone()
+        self.test_ap = ap.clone()
 
         pr_curve = torchmetrics.PrecisionRecallCurve(num_class)
 
@@ -90,9 +90,9 @@ class DAN(pl.LightningModule):
 
         loss = outputs["loss"]
 
-        self.train_auc(outputs["preds"].argmax(1), outputs["target"])
+        self.train_ap(outputs["preds"].argmax(1), outputs["target"])
 
-        self.log("AUC/train", self.train_auc)
+        self.log("Average Precision/train", self.train_ap)
 
         self.log("Loss/train", loss)
 
@@ -112,9 +112,9 @@ class DAN(pl.LightningModule):
 
         loss = outputs["loss"]
 
-        self.valid_auc(outputs["preds"].argmax(1), outputs["target"])
+        self.valid_ap(outputs["preds"].argmax(1), outputs["target"])
 
-        self.log("AUC/valid", self.valid_auc)
+        self.log("Average Precision/valid", self.valid_ap)
 
         self.log("Loss/valid", loss)
 
@@ -134,13 +134,13 @@ class DAN(pl.LightningModule):
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        auc = self.test_auc(preds.argmax(1), y)
+        ap = self.test_ap(preds.argmax(1), y)
 
         self.log_pr_curve(preds, y)
 
         self.log_confusion_matrix(preds.argmax(1), y)
 
-        self.log("AUC/test", auc)
+        self.log("Average Precision/test", ap)
 
     def log_pr_curve(self, preds, y):
 
