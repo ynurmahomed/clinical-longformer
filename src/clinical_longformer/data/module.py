@@ -31,12 +31,12 @@ def get_collate_fn(label_transform=None, text_transform=None):
         for (_label, _text) in batch:
 
             processed_label = _label
-            if label_transform:
+            if label_transform is not None:
                 processed_label = label_transform(_label)
             label_list.append(processed_label)
 
             processed_text = _text
-            if text_transform:
+            if text_transform is not None:
                 processed_text = text_transform(_text)
             text_list.append(processed_text)
 
