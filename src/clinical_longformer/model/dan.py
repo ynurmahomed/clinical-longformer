@@ -12,6 +12,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from torchmetrics.functional import auc
 from torchtext.experimental.vectors import GloVe
+from pytorch_lightning.loggers import TensorBoardLogger
 
 from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
 
@@ -43,6 +44,7 @@ class DAN(pl.LightningModule):
         num_class = len(labels)
 
         self.lr = lr
+        self.save_hyperparameters("lr")
 
         self.loss = loss
 
@@ -77,6 +79,9 @@ class DAN(pl.LightningModule):
         softmax = self.softmax(ff)
 
         return softmax
+
+    def on_train_start(self):
+        self.logger.log_hyperparams(self.hparams, {"hp/auc_pr": 0})
 
     def training_step(self, batch, batch_idx):
 
@@ -121,6 +126,8 @@ class DAN(pl.LightningModule):
         auc_pr = get_macro_auc_pr(precision, recall)
 
         self.log("AUC-PR (macro)/valid", auc_pr)
+
+        self.log("hp/auc_pr", auc_pr)
 
         self.log("Loss/valid", loss)
 
@@ -245,7 +252,9 @@ def main(args):
 
     model = DAN(vectors, dm.vocab, EMBED_DIM, dm.labels)
 
-    trainer = pl.Trainer.from_argparse_args(args)
+    logger = TensorBoardLogger("lightning_logs", name="DAN", default_hp_metric=False)
+
+    trainer = pl.Trainer.from_argparse_args(args, logger=logger)
 
     log_model_graph(dm, trainer, model)
 
