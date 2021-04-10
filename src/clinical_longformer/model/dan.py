@@ -80,6 +80,18 @@ class DAN(pl.LightningModule):
 
         self.confmat = torchmetrics.ConfusionMatrix(num_class, normalize="true")
 
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = parent_parser.add_argument_group("DAN")
+        parser.add_argument("--lr", type=float, default=LEARNING_RATE)
+        parser.add_argument("--num_hidden", type=int, default=NUM_HIDDEN)
+        return parent_parser
+
+    @staticmethod
+    def get_model_kwargs(namespace):
+        kwargs = vars(namespace)
+        return {k: kwargs[k] for k in kwargs.keys() & {"lr", "num_hidden"}}
+
     def forward(self, x, offsets):
 
         embedded = self.embedding(x, offsets)
@@ -242,6 +254,8 @@ def parse_args(args):
 
     parser.add_argument("--no_vectors", action="store_true")
 
+    parser = DAN.add_model_specific_args(parser)
+
     parser = pl.Trainer.add_argparse_args(
         parser.add_argument_group(title="pl.Trainer args")
     )
@@ -260,7 +274,7 @@ def main(args):
     else:
         vectors = GloVe(name="6B", dim=EMBED_DIM)
 
-    model = DAN(vectors, dm.vocab, EMBED_DIM, dm.labels)
+    model = DAN(vectors, dm.vocab, EMBED_DIM, dm.labels, **DAN.get_model_kwargs(args))
 
     logger = TensorBoardLogger("lightning_logs", name="DAN", default_hp_metric=False)
 
