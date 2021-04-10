@@ -20,6 +20,7 @@ from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
 BATCH_SIZE = 50
 EMBED_DIM = 300
 LEARNING_RATE = 0.01
+NUM_HIDDEN = 2
 
 
 def get_macro_auc_pr(precision, recall):
@@ -34,7 +35,14 @@ class DAN(pl.LightningModule):
     """
 
     def __init__(
-        self, vectors, vocab, embed_dim, labels, lr=LEARNING_RATE, loss=F.cross_entropy
+        self,
+        vectors,
+        vocab,
+        embed_dim,
+        labels,
+        lr=LEARNING_RATE,
+        num_hidden=NUM_HIDDEN,
+        loss=F.cross_entropy,
     ):
 
         super().__init__()
@@ -44,7 +52,7 @@ class DAN(pl.LightningModule):
         num_class = len(labels)
 
         self.lr = lr
-        self.save_hyperparameters("lr")
+        self.save_hyperparameters("lr", "num_hidden")
 
         self.loss = loss
 
@@ -54,11 +62,13 @@ class DAN(pl.LightningModule):
         else:
             self.embedding = nn.EmbeddingBag(len(vocab), embed_dim)
 
-        self.feed_forward = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim),
-            nn.ReLU(),
-            nn.Linear(embed_dim, num_class),
-        )
+        layers = []
+        for _ in range(num_hidden):
+            layers.append(nn.Linear(embed_dim, embed_dim))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(embed_dim, num_class))
+
+        self.feed_forward = nn.Sequential(*layers)
 
         self.softmax = nn.Softmax(dim=1)
 
