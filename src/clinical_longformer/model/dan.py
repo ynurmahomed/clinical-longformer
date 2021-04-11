@@ -183,7 +183,7 @@ class DAN(pl.LightningModule):
 
         self.log("AUC-PR (macro)/test", auc_pr)
 
-        self.logger.experiment.add_figure("PR Curve/Test", fig, self.current_epoch)
+        self.logger.experiment.add_figure("PR Curve/test", fig, self.current_epoch)
 
     def get_pr_curve(self, precision, recall):
 
@@ -224,7 +224,7 @@ class DAN(pl.LightningModule):
         plt.close(fig)
 
         self.logger.experiment.add_figure(
-            "Confusion Matrix/Test", fig, self.current_epoch
+            "Confusion Matrix/test", fig, self.current_epoch
         )
 
     def configure_optimizers(self):
