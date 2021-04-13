@@ -22,6 +22,7 @@ EMBED_DIM = 300
 LEARNING_RATE = 5e-3
 NUM_HIDDEN = 1
 W_DECAY = 1e-5
+WORD_DROPOUT = 0.3
 
 
 def get_macro_auc_pr(precision, recall):
@@ -44,6 +45,7 @@ class DAN(pl.LightningModule):
         lr=LEARNING_RATE,
         num_hidden=NUM_HIDDEN,
         weight_decay=W_DECAY,
+        p=WORD_DROPOUT,
         loss=F.cross_entropy,
     ):
 
@@ -55,7 +57,8 @@ class DAN(pl.LightningModule):
 
         self.lr = lr
         self.weight_decay = weight_decay
-        self.save_hyperparameters("lr", "num_hidden", "weight_decay")
+        self.p = p
+        self.save_hyperparameters("lr", "num_hidden", "weight_decay", "p")
 
         self.loss = loss
 
@@ -89,16 +92,24 @@ class DAN(pl.LightningModule):
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
         parser.add_argument("--num_hidden", type=int, default=NUM_HIDDEN)
         parser.add_argument("--weight_decay", type=float, default=W_DECAY)
+        parser.add_argument("--p", type=float, default=WORD_DROPOUT)
         return parent_parser
 
     @staticmethod
     def get_model_kwargs(namespace):
         kwargs = vars(namespace)
         return {
-            k: kwargs[k] for k in kwargs.keys() & {"lr", "num_hidden", "weight_decay"}
+            k: kwargs[k]
+            for k in kwargs.keys()
+            & {"lr", "num_hidden", "weight_decay", "p"}
         }
 
     def forward(self, x, offsets):
+
+        # Word dropout
+        p = torch.full_like(x, self.p, dtype=torch.float)
+        b = torch.bernoulli(p)
+        x[b == 0] = 0
 
         embedded = self.embedding(x, offsets)
 
