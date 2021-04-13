@@ -20,7 +20,6 @@ from torchtext.experimental.transforms import basic_english_normalize
 from torchtext.vocab import Vocab
 
 NUM_WORKERS = 4
-DATA_PATH = Path("/home/yassin/Projects/AI/Project/tedtalks")
 
 
 def get_collate_fn(label_transform=None, text_transform=None):
@@ -106,6 +105,7 @@ class MIMICIIIDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             collate_fn=get_collate_fn(),
             num_workers=NUM_WORKERS,
+            shuffle=True,
         )
 
     def val_dataloader(self):
