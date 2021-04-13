@@ -238,10 +238,6 @@ class DAN(pl.LightningModule):
             self.parameters(), lr=self.lr, weight_decay=self.weight_decay
         )
 
-    def get_offsets(self, xb):
-        offsets = [0] + [len(entry) for entry in xb]
-        return torch.tensor(offsets[:-1]).cumsum(dim=0)
-
 
 def get_data_module():
     p = Path("/home/yassin/Projects/Masters/code/discharge")
