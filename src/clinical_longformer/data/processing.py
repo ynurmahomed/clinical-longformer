@@ -462,11 +462,15 @@ def build_discharge_summary_dataset(mimic_path, note_length, out_path):
     df_discharge = df_adm_notes[df_adm_notes["CATEGORY"] == "Discharge summary"]
 
     # If multiple discharge summaries for same admission, replace with last
-    df_discharge = (
-        df_discharge.groupby(["SUBJECT_ID", "HADM_ID"]).nth(-1)
-    ).reset_index()
+    df_discharge = df_discharge.groupby(["SUBJECT_ID", "HADM_ID"]).nth(-1)
+    df_discharge = df_discharge.reset_index()
+
     df_discharge = df_discharge[df_discharge["TEXT"].notnull()]
-    df_discharge = df_discharge.pipe(preprocessing).pipe(chunk_text, note_length)
+
+    df_discharge = df_discharge.pipe(preprocessing)
+
+    if note_length != -1:
+        df_discharge = df_discharge.pipe(chunk_text, note_length)
 
     train, valid, test = split_discharge_summaries(df_adm, df_discharge, note_length)
 

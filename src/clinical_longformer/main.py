@@ -60,9 +60,9 @@ def parse_args(args):
     )
     parser.add_argument(
         dest="length",
-        help="set note length",
+        help="set note length, -1 means do not chunk text",
         type=int,
-        choices=[512, 1024, 2048, 4096],
+        choices=[-1, 512, 1024, 2048, 4096],
     )
     parser.add_argument(
         dest="out_path",
