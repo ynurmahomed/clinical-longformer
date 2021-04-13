@@ -19,8 +19,9 @@ from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
 
 BATCH_SIZE = 50
 EMBED_DIM = 300
-LEARNING_RATE = 0.01
-NUM_HIDDEN = 2
+LEARNING_RATE = 5e-3
+NUM_HIDDEN = 1
+W_DECAY = 1e-5
 
 
 def get_macro_auc_pr(precision, recall):
@@ -42,6 +43,7 @@ class DAN(pl.LightningModule):
         labels,
         lr=LEARNING_RATE,
         num_hidden=NUM_HIDDEN,
+        weight_decay=W_DECAY,
         loss=F.cross_entropy,
     ):
 
@@ -52,7 +54,8 @@ class DAN(pl.LightningModule):
         num_class = len(labels)
 
         self.lr = lr
-        self.save_hyperparameters("lr", "num_hidden")
+        self.weight_decay = weight_decay
+        self.save_hyperparameters("lr", "num_hidden", "weight_decay")
 
         self.loss = loss
 
@@ -85,12 +88,15 @@ class DAN(pl.LightningModule):
         parser = parent_parser.add_argument_group("DAN")
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
         parser.add_argument("--num_hidden", type=int, default=NUM_HIDDEN)
+        parser.add_argument("--weight_decay", type=float, default=W_DECAY)
         return parent_parser
 
     @staticmethod
     def get_model_kwargs(namespace):
         kwargs = vars(namespace)
-        return {k: kwargs[k] for k in kwargs.keys() & {"lr", "num_hidden"}}
+        return {
+            k: kwargs[k] for k in kwargs.keys() & {"lr", "num_hidden", "weight_decay"}
+        }
 
     def forward(self, x, offsets):
 
@@ -228,7 +234,9 @@ class DAN(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        return torch.optim.Adagrad(self.parameters(), lr=self.lr)
+        return torch.optim.Adagrad(
+            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
+        )
 
     def get_offsets(self, xb):
         offsets = [0] + [len(entry) for entry in xb]
