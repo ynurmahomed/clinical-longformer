@@ -290,7 +290,9 @@ def main(args):
 
     model = DAN(vectors, dm.vocab, EMBED_DIM, dm.labels, **DAN.get_model_kwargs(args))
 
-    logger = TensorBoardLogger("lightning_logs", name="DAN", default_hp_metric=False)
+    logger = TensorBoardLogger(
+        "lightning_logs", name="DAN", default_hp_metric=False, log_graph=True
+    )
 
     trainer = pl.Trainer.from_argparse_args(args, logger=logger)
 
