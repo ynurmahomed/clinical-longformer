@@ -196,7 +196,7 @@ class DAN(pl.LightningModule):
         pr_per_class = []
 
         for i, l in enumerate(self.labels):
-            d = {"Precision": precision[i], "Recall": recall[i], "Label": l}
+            d = {"Precision": precision[i].cpu(), "Recall": recall[i].cpu(), "Label": l}
             df = pd.DataFrame(d)
             pr_per_class.append(df)
 
@@ -222,7 +222,7 @@ class DAN(pl.LightningModule):
         self.confmat(preds, y)
 
         cm_df = pd.DataFrame(
-            self.confmat.compute().numpy(), index=self.labels, columns=self.labels
+            self.confmat.compute().cpu().numpy(), index=self.labels, columns=self.labels
         )
 
         plt.figure(figsize=(10, 7))
