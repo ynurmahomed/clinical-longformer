@@ -100,8 +100,7 @@ class DAN(pl.LightningModule):
         kwargs = vars(namespace)
         return {
             k: kwargs[k]
-            for k in kwargs.keys()
-            & {"lr", "num_hidden", "weight_decay", "p"}
+            for k in kwargs.keys() & {"lr", "num_hidden", "weight_decay", "p"}
         }
 
     def forward(self, x, offsets):
