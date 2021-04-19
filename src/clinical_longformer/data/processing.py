@@ -498,7 +498,10 @@ def build_all_notes_dataset(mimic_path, note_length, n_days, out_path):
     less_n_days = chartdate - admittime < pd.Timedelta(n_days, "days")
     df_n_days = df_adm_notes[less_n_days]
     df_n_days = df_n_days[df_n_days.TEXT.notnull()]
-    df_n_days = df_n_days.pipe(preprocessing).pipe(chunk_text, note_length)
+    df_n_days = df_n_days.pipe(preprocessing)
+
+    if note_length != -1:
+        df_n_days = df_n_days.pipe(chunk_text, note_length)
 
     train, valid, test = split_all_notes(df_adm, df_n_days, n_days, note_length)
 
