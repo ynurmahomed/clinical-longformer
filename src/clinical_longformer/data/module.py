@@ -1,10 +1,12 @@
 import pandas as pd
 import pytorch_lightning as pl
+import random
 import sys
 import torch
 
 from collections import Counter
 from pathlib import Path
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 from torchtext.experimental.datasets import AG_NEWS
 from torchtext.experimental.datasets.text_classification import (
@@ -24,7 +26,18 @@ NUM_WORKERS = 4
 
 
 class MIMICIIIDataModule(pl.LightningDataModule):
-    def __init__(self, path, note_length, batch_size):
+    def __init__(self, path, note_length, batch_size, pad_batch=False):
+        """MIMIC-III DataModule.
+
+        Args:
+            path (Path): MIMIC-III dataset location.
+            note_length (int): Length of clinical notes.
+            batch_size (int): Batch size.
+            pad_batch (bool, optional): If sequences inside batch should be padded.
+                If set to `True`, sequences in batch will be padded with 0 to match
+                the longest sequence. Also sequences with similar lengths will be
+                batched together to minimize padding. Defaults to False.
+        """
 
         super().__init__()
 
@@ -33,6 +46,7 @@ class MIMICIIIDataModule(pl.LightningDataModule):
         self.vocab = None
         self.label_vocab = None
         self.batch_size = batch_size
+        self.pad_batch = pad_batch
 
     def setup(self):
 
@@ -88,30 +102,61 @@ class MIMICIIIDataModule(pl.LightningDataModule):
             torch.tensor(offsets[:-1]).cumsum(dim=0),
         )
 
-    def train_dataloader(self):
+    def collate_padded(self, batch):
+        label_list, text_list = [], []
+        for (_label, _text) in batch:
+            label_list.append(_label)
+            text_list.append(_text)
+        return torch.tensor(label_list), pad_sequence(text_list)
+
+    def get_collate_fn(self):
+        if self.pad_batch:
+            return self.collate_padded
+        else:
+            return self.collate_fn
+
+    def batch_sampler(self, dataset):
+        indices = [(i, len(s[1])) for i, s in enumerate(dataset)]
+        random.shuffle(indices)
+        pooled_indices = []
+        # create pool of indices with similar lengths
+        for i in range(0, len(indices), self.batch_size * 100):
+            pooled_indices.extend(
+                sorted(indices[i : i + self.batch_size * 100], key=lambda x: x[1])
+            )
+
+        pooled_indices = [x[0] for x in pooled_indices]
+
+        # yield indices for current batch
+        for i in range(0, len(pooled_indices), self.batch_size):
+            yield pooled_indices[i : i + self.batch_size]
+
+    def get_batch_sampler(self):
+        if self.pad_batch:
+            return self.batch_sampler()
+        else:
+            return None
+
+    def get_dataloader(self, dataset, shuffle=False):
+        collate_fn = self.get_collate_fn()
+        batch_sampler = self.get_batch_sampler()
         return DataLoader(
-            self.train,
-            batch_size=self.batch_size,
-            collate_fn=self.collate_fn,
+            dataset,
+            self.batch_size,
+            collate_fn=collate_fn,
             num_workers=NUM_WORKERS,
-            shuffle=True,
+            shuffle=shuffle,
+            batch_sampler=batch_sampler,
         )
+
+    def train_dataloader(self):
+        return self.get_dataloader(self.train, shuffle=True)
 
     def val_dataloader(self):
-        return DataLoader(
-            self.valid,
-            batch_size=self.batch_size,
-            collate_fn=self.collate_fn,
-            num_workers=NUM_WORKERS,
-        )
+        return self.get_dataloader(self.valid)
 
     def test_dataloader(self):
-        return DataLoader(
-            self.test,
-            batch_size=self.batch_size,
-            collate_fn=self.collate_fn,
-            num_workers=NUM_WORKERS,
-        )
+        return self.get_dataloader(self.test)
 
 
 class AGNNewsDataModule(pl.LightningDataModule):
