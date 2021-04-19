@@ -19,10 +19,13 @@ from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
 
 BATCH_SIZE = 50
 EMBED_DIM = 300
-LEARNING_RATE = 1e-2
-NUM_HIDDEN = 2
+
+
+# Default hyperparameters
+LEARNING_RATE = 5e-2
+NUM_HIDDEN = 1
 W_DECAY = 1e-5
-WORD_DROPOUT = 0.3
+WORD_DROPOUT = 0.5
 
 
 def get_macro_auc_pr(precision, recall):
@@ -42,10 +45,7 @@ class DAN(pl.LightningModule):
         vocab,
         embed_dim,
         labels,
-        lr=LEARNING_RATE,
-        num_hidden=NUM_HIDDEN,
-        weight_decay=W_DECAY,
-        p=WORD_DROPOUT,
+        hparams,
         loss=F.cross_entropy,
     ):
 
@@ -55,10 +55,10 @@ class DAN(pl.LightningModule):
 
         num_class = len(labels)
 
-        self.lr = lr
-        self.weight_decay = weight_decay
-        self.p = p
-        self.save_hyperparameters("lr", "num_hidden", "weight_decay", "p")
+        self.lr = hparams["lr"]
+        self.weight_decay = hparams["weight_decay"]
+        self.p = hparams["p"]
+        self.hparams = hparams
 
         self.loss = loss
 
@@ -69,7 +69,7 @@ class DAN(pl.LightningModule):
             self.embedding = nn.EmbeddingBag(len(vocab), embed_dim)
 
         layers = []
-        for _ in range(num_hidden):
+        for _ in range(hparams["num_hidden"]):
             layers.append(nn.Linear(embed_dim, embed_dim))
             layers.append(nn.ReLU())
         layers.append(nn.Linear(embed_dim, num_class))
@@ -96,11 +96,11 @@ class DAN(pl.LightningModule):
         return parent_parser
 
     @staticmethod
-    def get_model_kwargs(namespace):
-        kwargs = vars(namespace)
+    def get_model_hparams(namespace):
+        hparams = vars(namespace)
         return {
-            k: kwargs[k]
-            for k in kwargs.keys() & {"lr", "num_hidden", "weight_decay", "p"}
+            k: hparams[k]
+            for k in hparams.keys() & {"lr", "num_hidden", "weight_decay", "p"}
         }
 
     def forward(self, x, offsets):
@@ -288,7 +288,7 @@ def main(args):
     else:
         vectors = GloVe(name="6B", dim=EMBED_DIM)
 
-    model = DAN(vectors, dm.vocab, EMBED_DIM, dm.labels, **DAN.get_model_kwargs(args))
+    model = DAN(vectors, dm.vocab, EMBED_DIM, dm.labels, DAN.get_model_hparams(args))
 
     logger = TensorBoardLogger(
         "lightning_logs", name="DAN", default_hp_metric=False, log_graph=True
