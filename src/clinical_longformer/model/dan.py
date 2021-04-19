@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import os
 import pandas as pd
 import pytorch_lightning as pl
 import seaborn as sns
@@ -249,10 +250,9 @@ class DAN(pl.LightningModule):
         )
 
 
-def get_data_module():
-    p = Path("/home/yassin/Projects/Masters/code/discharge")
-    note_length = -1
-    dm = MIMICIIIDataModule(p, note_length, BATCH_SIZE)
+def get_data_module(args):
+    p = Path(args.mimic_path)
+    dm = MIMICIIIDataModule(p, BATCH_SIZE)
     dm.setup()
     return dm
 
@@ -265,6 +265,13 @@ def log_model_graph(datamodule, trainer, model):
 def parse_args(args):
 
     parser = ArgumentParser()
+
+    parser.add_argument(
+        dest="mimic_path",
+        help="Path containing train/valid/test datasets",
+        type=str,
+        default=os.getcwd(),
+    )
 
     parser.add_argument("--no_vectors", action="store_true")
 
@@ -281,7 +288,7 @@ def main(args):
 
     args = parse_args(args)
 
-    dm = get_data_module()
+    dm = get_data_module(args)
 
     if args.no_vectors:
         vectors = None

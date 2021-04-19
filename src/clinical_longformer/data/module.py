@@ -26,12 +26,11 @@ NUM_WORKERS = 4
 
 
 class MIMICIIIDataModule(pl.LightningDataModule):
-    def __init__(self, path, note_length, batch_size, pad_batch=False):
+    def __init__(self, path, batch_size, pad_batch=False):
         """MIMIC-III DataModule.
 
         Args:
             path (Path): MIMIC-III dataset location.
-            note_length (int): Length of clinical notes.
             batch_size (int): Batch size.
             pad_batch (bool, optional): If sequences inside batch should be padded.
                 If set to `True`, sequences in batch will be padded with 0 to match
@@ -42,7 +41,6 @@ class MIMICIIIDataModule(pl.LightningDataModule):
         super().__init__()
 
         self.path = path
-        self.note_length = note_length
         self.vocab = None
         self.label_vocab = None
         self.batch_size = batch_size
@@ -54,9 +52,9 @@ class MIMICIIIDataModule(pl.LightningDataModule):
 
         self.labels = ["Not Readmitted", "Readmitted"]
 
-        train = pd.read_csv(self.path / str(self.note_length) / "train.csv")
-        valid = pd.read_csv(self.path / str(self.note_length) / "valid.csv")
-        test = pd.read_csv(self.path / str(self.note_length) / "test.csv")
+        train = pd.read_csv(self.path / "train.csv")
+        valid = pd.read_csv(self.path / "valid.csv")
+        test = pd.read_csv(self.path / "test.csv")
 
         train_data = self.get_tuples(train[columns])
         valid_data = self.get_tuples(valid[columns])
