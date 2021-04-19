@@ -19,8 +19,8 @@ from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
 
 BATCH_SIZE = 50
 EMBED_DIM = 300
-LEARNING_RATE = 5e-3
-NUM_HIDDEN = 1
+LEARNING_RATE = 1e-2
+NUM_HIDDEN = 2
 W_DECAY = 1e-5
 WORD_DROPOUT = 0.3
 
@@ -251,7 +251,7 @@ class DAN(pl.LightningModule):
 
 def get_data_module():
     p = Path("/home/yassin/Projects/Masters/code/discharge")
-    note_length = 512
+    note_length = -1
     dm = MIMICIIIDataModule(p, note_length, BATCH_SIZE)
     dm.setup()
     return dm
