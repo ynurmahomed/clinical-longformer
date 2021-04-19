@@ -19,35 +19,8 @@ from torchtext.experimental.functional import (
 from torchtext.experimental.transforms import basic_english_normalize
 from torchtext.vocab import Vocab
 
+
 NUM_WORKERS = 4
-
-
-def get_collate_fn(label_transform=None, text_transform=None):
-    def func(batch):
-
-        label_list, text_list, offsets = [], [], [0]
-
-        for (_label, _text) in batch:
-
-            processed_label = _label
-            if label_transform is not None:
-                processed_label = label_transform(_label)
-            label_list.append(processed_label)
-
-            processed_text = _text
-            if text_transform is not None:
-                processed_text = text_transform(_text)
-            text_list.append(processed_text)
-
-            offsets.append(processed_text.size(0))
-
-        return (
-            torch.tensor(label_list),
-            torch.cat(text_list),
-            torch.tensor(offsets[:-1]).cumsum(dim=0),
-        )
-
-    return func
 
 
 class MIMICIIIDataModule(pl.LightningDataModule):
@@ -99,11 +72,27 @@ class MIMICIIIDataModule(pl.LightningDataModule):
     ):
         return list(dataframe.itertuples(index=False))
 
+    def collate_fn(self, batch):
+        label_list, text_list, offsets = [], [], [0]
+
+        for (_label, _text) in batch:
+
+            label_list.append(_label)
+
+            text_list.append(_text)
+            offsets.append(_text.size(0))
+
+        return (
+            torch.tensor(label_list),
+            torch.cat(text_list),
+            torch.tensor(offsets[:-1]).cumsum(dim=0),
+        )
+
     def train_dataloader(self):
         return DataLoader(
             self.train,
             batch_size=self.batch_size,
-            collate_fn=get_collate_fn(),
+            collate_fn=self.collate_fn,
             num_workers=NUM_WORKERS,
             shuffle=True,
         )
@@ -112,7 +101,7 @@ class MIMICIIIDataModule(pl.LightningDataModule):
         return DataLoader(
             self.valid,
             batch_size=self.batch_size,
-            collate_fn=get_collate_fn(),
+            collate_fn=self.collate_fn,
             num_workers=NUM_WORKERS,
         )
 
@@ -120,7 +109,7 @@ class MIMICIIIDataModule(pl.LightningDataModule):
         return DataLoader(
             self.test,
             batch_size=self.batch_size,
-            collate_fn=get_collate_fn(),
+            collate_fn=self.collate_fn,
             num_workers=NUM_WORKERS,
         )
 
@@ -148,29 +137,43 @@ class AGNNewsDataModule(pl.LightningDataModule):
 
         self.text_transform = lambda t: t
 
+    def collate_fn(self, batch):
+        label_list, text_list, offsets = [], [], [0]
+
+        for (_label, _text) in batch:
+
+            label_list.append(self.label_transform(_label))
+
+            processed_text = self.text_transform(_text)
+            text_list.append(processed_text)
+            offsets.append(processed_text.size(0))
+
+        return (
+            torch.tensor(label_list),
+            torch.cat(text_list),
+            torch.tensor(offsets[:-1]).cumsum(dim=0),
+        )
+
     def train_dataloader(self):
-        collate_fn = get_collate_fn(self.label_transform, self.text_transform)
         return DataLoader(
             self.train,
             batch_size=self.batch_size,
-            collate_fn=collate_fn,
+            collate_fn=self.collate_fn,
             num_workers=NUM_WORKERS,
         )
 
     def val_dataloader(self):
-        collate_fn = get_collate_fn(self.label_transform, self.text_transform)
         return DataLoader(
             self.valid,
             batch_size=self.batch_size,
-            collate_fn=collate_fn,
+            collate_fn=self.collate_fn,
             num_workers=NUM_WORKERS,
         )
 
     def test_dataloader(self):
-        collate_fn = get_collate_fn(self.label_transform, self.text_transform)
         return DataLoader(
             self.test,
             batch_size=self.batch_size,
-            collate_fn=collate_fn,
+            collate_fn=self.collate_fn,
             num_workers=NUM_WORKERS,
         )
