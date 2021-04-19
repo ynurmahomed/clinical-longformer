@@ -22,11 +22,8 @@ from torchtext.experimental.transforms import basic_english_normalize
 from torchtext.vocab import Vocab
 
 
-NUM_WORKERS = 4
-
-
 class MIMICIIIDataModule(pl.LightningDataModule):
-    def __init__(self, path, batch_size, pad_batch=False):
+    def __init__(self, path, batch_size, num_workers, pad_batch=False):
         """MIMIC-III DataModule.
 
         Args:
@@ -44,6 +41,7 @@ class MIMICIIIDataModule(pl.LightningDataModule):
         self.vocab = None
         self.label_vocab = None
         self.batch_size = batch_size
+        self.num_workers = num_workers
         self.pad_batch = pad_batch
 
     def setup(self):
@@ -142,7 +140,7 @@ class MIMICIIIDataModule(pl.LightningDataModule):
             dataset,
             self.batch_size,
             collate_fn=collate_fn,
-            num_workers=NUM_WORKERS,
+            num_workers=self.num_workers,
             shuffle=shuffle,
             batch_sampler=batch_sampler,
         )
@@ -158,9 +156,13 @@ class MIMICIIIDataModule(pl.LightningDataModule):
 
 
 class AGNNewsDataModule(pl.LightningDataModule):
-    def __init__(self, batch_size):
+    def __init__(self, batch_size, num_workers):
+
         super().__init__()
+
         self.batch_size = batch_size
+
+        self.num_workers = num_workers
 
     def setup(self):
 
@@ -202,7 +204,7 @@ class AGNNewsDataModule(pl.LightningDataModule):
             self.train,
             batch_size=self.batch_size,
             collate_fn=self.collate_fn,
-            num_workers=NUM_WORKERS,
+            num_workers=self.num_workers,
         )
 
     def val_dataloader(self):
@@ -210,7 +212,7 @@ class AGNNewsDataModule(pl.LightningDataModule):
             self.valid,
             batch_size=self.batch_size,
             collate_fn=self.collate_fn,
-            num_workers=NUM_WORKERS,
+            num_workers=self.num_workers,
         )
 
     def test_dataloader(self):
@@ -218,5 +220,5 @@ class AGNNewsDataModule(pl.LightningDataModule):
             self.test,
             batch_size=self.batch_size,
             collate_fn=self.collate_fn,
-            num_workers=NUM_WORKERS,
+            num_workers=self.num_workers,
         )

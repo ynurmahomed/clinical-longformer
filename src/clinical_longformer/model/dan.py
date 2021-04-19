@@ -252,7 +252,7 @@ class DAN(pl.LightningModule):
 
 def get_data_module(args):
     p = Path(args.mimic_path)
-    dm = MIMICIIIDataModule(p, BATCH_SIZE)
+    dm = MIMICIIIDataModule(p, BATCH_SIZE, args.num_workers)
     dm.setup()
     return dm
 
@@ -274,6 +274,13 @@ def parse_args(args):
     )
 
     parser.add_argument("--no_vectors", action="store_true")
+
+    parser.add_argument(
+        "--num_workers",
+        help="How many subprocesses to use for data loading. `0` means that the data will be loaded in the main process.",
+        type=int,
+        default=0,
+    )
 
     parser = DAN.add_model_specific_args(parser)
 
