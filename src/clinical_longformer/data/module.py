@@ -7,7 +7,7 @@ import torch
 from collections import Counter
 from pathlib import Path
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Sampler
 from torchtext.experimental.datasets import AG_NEWS
 from torchtext.experimental.datasets.text_classification import (
     build_vocab,
@@ -20,6 +20,45 @@ from torchtext.experimental.functional import (
 )
 from torchtext.experimental.transforms import basic_english_normalize
 from torchtext.vocab import Vocab
+
+
+class BatchRandomPooledSampler(Sampler):
+    """A Sampler that batches examples with text of similar sizes together in order
+    to minimize padding. Examples should be in the form of tuples (label, text).
+    """
+    def __init__(self, data_source, batch_size):
+
+        self.data_source = data_source
+
+        self.batch_size = batch_size
+
+    def __iter__(self):
+
+        indices = [(i, len(s[1])) for i, s in enumerate(self.data_source)]
+
+        random.shuffle(indices)
+
+        pooled_indices = []
+
+        p_size = self.batch_size * 100
+
+        # create pool of indices with similar lengths
+        for i in range(0, len(indices), p_size):
+
+            by_len = sorted(indices[i : i + p_size], key=lambda x: x[1])
+
+            pooled_indices.extend(by_len)
+
+        pooled_indices = [x[0] for x in pooled_indices]
+
+        batches = []
+        for i in range(0, len(pooled_indices), self.batch_size):
+            batches.append(pooled_indices[i : i + self.batch_size])
+
+        return iter(batches)
+
+    def __len__(self):
+        return len(self.data_source) // self.batch_size
 
 
 class MIMICIIIDataModule(pl.LightningDataModule):
@@ -105,39 +144,11 @@ class MIMICIIIDataModule(pl.LightningDataModule):
             text_list.append(_text)
         return torch.tensor(label_list), pad_sequence(text_list)
 
-    def get_collate_fn(self):
-        if self.pad_batch:
-            return self.collate_padded
-        else:
-            return self.collate_fn
-
-    def batch_sampler(self, dataset):
-        indices = [(i, len(s[1])) for i, s in enumerate(dataset)]
-        random.shuffle(indices)
-        pooled_indices = []
-        # create pool of indices with similar lengths
-        for i in range(0, len(indices), self.batch_size * 100):
-            pooled_indices.extend(
-                sorted(indices[i : i + self.batch_size * 100], key=lambda x: x[1])
-            )
-
-        pooled_indices = [x[0] for x in pooled_indices]
-
-        # yield indices for current batch
-        for i in range(0, len(pooled_indices), self.batch_size):
-            yield pooled_indices[i : i + self.batch_size]
-
-    def get_batch_sampler(self, dataset):
-        if self.pad_batch:
-            return self.batch_sampler(dataset)
-        else:
-            return None
-
     def get_dataloader(self, dataset, shuffle=False):
-        collate_fn = self.get_collate_fn()
-        batch_sampler = self.get_batch_sampler(dataset)
 
         if self.pad_batch:
+            batch_sampler = BatchRandomPooledSampler(dataset, self.batch_size)
+            collate_fn = self.collate_padded
             return DataLoader(
                 dataset,
                 batch_sampler=batch_sampler,
@@ -145,6 +156,7 @@ class MIMICIIIDataModule(pl.LightningDataModule):
                 num_workers=self.num_workers,
             )
         else:
+            collate_fn = self.collate_fn
             return DataLoader(
                 dataset,
                 self.batch_size,
@@ -164,13 +176,15 @@ class MIMICIIIDataModule(pl.LightningDataModule):
 
 
 class AGNNewsDataModule(pl.LightningDataModule):
-    def __init__(self, batch_size, num_workers):
+    def __init__(self, batch_size, num_workers, pad_batch=False):
 
         super().__init__()
 
         self.batch_size = batch_size
 
         self.num_workers = num_workers
+
+        self.pad_batch = pad_batch
 
     def setup(self):
 
@@ -207,26 +221,39 @@ class AGNNewsDataModule(pl.LightningDataModule):
             torch.tensor(offsets[:-1]).cumsum(dim=0),
         )
 
+    def collate_padded(self, batch):
+        label_list, text_list = [], []
+        for (_label, _text) in batch:
+            label_list.append(self.label_transform(_label))
+            text_list.append(self.text_transform(_text))
+        return torch.tensor(label_list), pad_sequence(text_list)
+
+    def get_dataloader(self, dataset, shuffle=False):
+
+        if self.pad_batch:
+            batch_sampler = BatchRandomPooledSampler(dataset, self.batch_size)
+            collate_fn = self.collate_padded
+            return DataLoader(
+                dataset,
+                batch_sampler=batch_sampler,
+                collate_fn=collate_fn,
+                num_workers=self.num_workers,
+            )
+        else:
+            collate_fn = self.collate_fn
+            return DataLoader(
+                dataset,
+                self.batch_size,
+                collate_fn=collate_fn,
+                num_workers=self.num_workers,
+                shuffle=shuffle,
+            )
+
     def train_dataloader(self):
-        return DataLoader(
-            self.train,
-            batch_size=self.batch_size,
-            collate_fn=self.collate_fn,
-            num_workers=self.num_workers,
-        )
+        return self.get_dataloader(self.train, shuffle=True)
 
     def val_dataloader(self):
-        return DataLoader(
-            self.valid,
-            batch_size=self.batch_size,
-            collate_fn=self.collate_fn,
-            num_workers=self.num_workers,
-        )
+        return self.get_dataloader(self.valid)
 
     def test_dataloader(self):
-        return DataLoader(
-            self.test,
-            batch_size=self.batch_size,
-            collate_fn=self.collate_fn,
-            num_workers=self.num_workers,
-        )
+        return self.get_dataloader(self.test)
