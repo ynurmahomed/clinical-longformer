@@ -217,9 +217,9 @@ def get_data_module(args):
     return dm
 
 
-def log_model_graph(datamodule, trainer, model):
+def set_example_input_array(datamodule, model):
     _, x, offsets = next(iter(datamodule.train_dataloader()))
-    trainer.logger.log_graph(model, (x, offsets))
+    model.example_input_array = [x, offsets]
 
 
 def parse_args(args):
@@ -270,7 +270,7 @@ def main(args):
 
     trainer = pl.Trainer.from_argparse_args(args, logger=logger)
 
-    log_model_graph(dm, trainer, model)
+    set_example_input_array(dm, model)
 
     trainer.fit(model, datamodule=dm)
 
