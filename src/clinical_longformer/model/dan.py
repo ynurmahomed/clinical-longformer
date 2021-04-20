@@ -1,13 +1,10 @@
-import matplotlib.pyplot as plt
 import os
-import pandas as pd
 import pytorch_lightning as pl
-import seaborn as sns
 import sys
 import torch
-import torchmetrics
 import torch.nn as nn
 import torch.nn.functional as F
+import torchmetrics
 
 from argparse import ArgumentParser
 from pathlib import Path
@@ -16,7 +13,7 @@ from torchtext.experimental.vectors import GloVe
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
-
+from .utils import macro_auc_pr, plot_pr_curve, plot_confusion_matrix
 
 BATCH_SIZE = 50
 EMBED_DIM = 300
@@ -27,10 +24,6 @@ LEARNING_RATE = 5e-2
 NUM_HIDDEN = 1
 W_DECAY = 1e-5
 WORD_DROPOUT = 0.5
-
-
-def get_macro_auc_pr(precision, recall):
-    return torch.tensor([auc(r, p) for r, p in zip(recall, precision)]).mean()
 
 
 class DAN(pl.LightningModule):
@@ -79,6 +72,7 @@ class DAN(pl.LightningModule):
 
         self.softmax = nn.Softmax(dim=1)
 
+        # Metrics
         pr_curve = torchmetrics.PrecisionRecallCurve(num_class)
 
         self.train_pr_curve = pr_curve.clone()
@@ -138,7 +132,7 @@ class DAN(pl.LightningModule):
 
         precision, recall, _ = self.train_pr_curve(outputs["preds"], outputs["target"])
 
-        auc_pr = get_macro_auc_pr(precision, recall)
+        auc_pr = macro_auc_pr(precision, recall)
 
         self.log("AUC-PR (macro)/train", auc_pr)
 
@@ -162,7 +156,7 @@ class DAN(pl.LightningModule):
 
         precision, recall, _ = self.valid_pr_curve(outputs["preds"], outputs["target"])
 
-        auc_pr = get_macro_auc_pr(precision, recall)
+        auc_pr = macro_auc_pr(precision, recall)
 
         self.log("AUC-PR (macro)/valid", auc_pr)
 
@@ -192,51 +186,19 @@ class DAN(pl.LightningModule):
 
         precision, recall, _ = self.test_pr_curve(preds, y)
 
-        fig = self.get_pr_curve(precision, recall)
+        fig = plot_pr_curve(precision, recall, self.labels)
 
-        auc_pr = get_macro_auc_pr(precision, recall)
+        auc_pr = macro_auc_pr(precision, recall)
 
         self.log("AUC-PR (macro)/test", auc_pr)
 
         self.logger.experiment.add_figure("PR Curve/test", fig, self.current_epoch)
 
-    def get_pr_curve(self, precision, recall):
-
-        pr_per_class = []
-
-        for i, l in enumerate(self.labels):
-            d = {"Precision": precision[i].cpu(), "Recall": recall[i].cpu(), "Label": l}
-            df = pd.DataFrame(d)
-            pr_per_class.append(df)
-
-        pr = pd.concat(pr_per_class)
-
-        plt.figure(figsize=(10, 7))
-
-        ax = sns.lineplot(data=pr, x="Recall", y="Precision", hue="Label")
-
-        h, l = ax.get_legend_handles_labels()
-        legend_labels = [
-            f"{c} (AUC {auc(recall[i], precision[i]):.2f})" for i, c in enumerate(l)
-        ]
-        ax.legend(h, legend_labels)
-
-        fig = ax.get_figure()
-        plt.close(fig)
-
-        return fig
-
     def log_confusion_matrix(self, preds, y):
 
-        self.confmat(preds, y)
+        cm = self.confmat(preds, y)
 
-        cm_df = pd.DataFrame(
-            self.confmat.compute().cpu().numpy(), index=self.labels, columns=self.labels
-        )
-
-        plt.figure(figsize=(10, 7))
-        fig = sns.heatmap(cm_df, annot=True, cmap="Spectral").get_figure()
-        plt.close(fig)
+        fig = plot_confusion_matrix(cm, self.labels, self.labels)
 
         self.logger.experiment.add_figure(
             "Confusion Matrix/test", fig, self.current_epoch
