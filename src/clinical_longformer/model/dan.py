@@ -120,7 +120,7 @@ class DAN(pl.LightningModule):
         return softmax
 
     def on_train_start(self):
-        self.logger.log_hyperparams(self.hparams, {"hp/auc_pr": 0})
+        self.logger.log_hyperparams(self.hparams, {"AUC-PR (macro)/valid": 0})
 
     def training_step(self, batch, batch_idx):
 
@@ -165,8 +165,6 @@ class DAN(pl.LightningModule):
         auc_pr = get_macro_auc_pr(precision, recall)
 
         self.log("AUC-PR (macro)/valid", auc_pr)
-
-        self.log("hp/auc_pr", auc_pr)
 
         self.log("Loss/valid", loss)
 
