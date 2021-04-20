@@ -127,23 +127,31 @@ class MIMICIIIDataModule(pl.LightningDataModule):
         for i in range(0, len(pooled_indices), self.batch_size):
             yield pooled_indices[i : i + self.batch_size]
 
-    def get_batch_sampler(self):
+    def get_batch_sampler(self, dataset):
         if self.pad_batch:
-            return self.batch_sampler()
+            return self.batch_sampler(dataset)
         else:
             return None
 
     def get_dataloader(self, dataset, shuffle=False):
         collate_fn = self.get_collate_fn()
-        batch_sampler = self.get_batch_sampler()
-        return DataLoader(
-            dataset,
-            self.batch_size,
-            collate_fn=collate_fn,
-            num_workers=self.num_workers,
-            shuffle=shuffle,
-            batch_sampler=batch_sampler,
-        )
+        batch_sampler = self.get_batch_sampler(dataset)
+
+        if self.pad_batch:
+            return DataLoader(
+                dataset,
+                batch_sampler=batch_sampler,
+                collate_fn=collate_fn,
+                num_workers=self.num_workers,
+            )
+        else:
+            return DataLoader(
+                dataset,
+                self.batch_size,
+                collate_fn=collate_fn,
+                num_workers=self.num_workers,
+                shuffle=shuffle,
+            )
 
     def train_dataloader(self):
         return self.get_dataloader(self.train, shuffle=True)
