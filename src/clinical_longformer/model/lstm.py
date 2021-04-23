@@ -23,9 +23,7 @@ LEARNING_RATE = 1e-3
 
 
 class LSTMClassifier(pl.LightningModule):
-    def __init__(
-        self, vectors, vocab, embed_dim, labels, hparams, loss=F.cross_entropy
-    ):
+    def __init__(self, vectors, vocab, embed_dim, labels, hparams):
         super().__init__()
 
         self.labels = labels
@@ -34,8 +32,6 @@ class LSTMClassifier(pl.LightningModule):
         hidden_dim = hparams["hidden_dim"]
         self.lr = hparams["lr"]
         self.hparams = hparams
-
-        self.loss = loss
 
         if vectors is not None:
             pre_trained = vectors(vocab.itos)
@@ -47,7 +43,9 @@ class LSTMClassifier(pl.LightningModule):
 
         self.linear = nn.Linear(hidden_dim, num_class)
 
-        self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.LogSoftmax(dim=1)
+
+        self.nll_loss = F.nll_loss
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -80,7 +78,7 @@ class LSTMClassifier(pl.LightningModule):
 
         preds = self(x)
 
-        loss = self.loss(preds, y)
+        loss = self.nll_loss(preds, y)
 
         return {"loss": loss, "preds": preds, "target": y}
 
@@ -98,7 +96,7 @@ class LSTMClassifier(pl.LightningModule):
 
         preds = self(x)
 
-        loss = self.loss(preds, y)
+        loss = self.nll_loss(preds, y)
 
         return {"loss": loss, "preds": preds, "target": y}
 
@@ -116,7 +114,7 @@ class LSTMClassifier(pl.LightningModule):
 
         preds = self(x)
 
-        loss = self.loss(preds, y)
+        loss = self.nll_loss(preds, y)
 
         return {"loss": loss, "preds": preds, "target": y}
 
