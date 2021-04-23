@@ -181,8 +181,7 @@ class LSTMClassifier(pl.LightningModule):
 
 def get_data_module(args):
     p = Path(args.mimic_path)
-    # dm = MIMICIIIDataModule(p, BATCH_SIZE, args.num_workers, pad_batch=True)
-    dm = AGNNewsDataModule(BATCH_SIZE, args.num_workers, pad_batch=True)
+    dm = MIMICIIIDataModule(p, BATCH_SIZE, args.num_workers, pad_batch=True)
     dm.setup()
     return dm
 
