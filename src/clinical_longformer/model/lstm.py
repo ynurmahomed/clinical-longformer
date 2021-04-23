@@ -82,6 +82,9 @@ class LSTMClassifier(pl.LightningModule):
 
         return softmax
 
+    def on_train_start(self):
+        self.logger.log_hyperparams(self.hparams, {"AUC-PR (macro)/valid": 0})
+
     def training_step(self, batch, batch_idx):
 
         y, x = batch
