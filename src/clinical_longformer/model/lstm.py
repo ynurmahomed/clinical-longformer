@@ -74,7 +74,7 @@ class LSTMClassifier(pl.LightningModule):
 
         embedding = self.embedding(x)
 
-        out, hidden = self.lstm(embedding)
+        out, _ = self.lstm(embedding)
 
         linear = self.linear(out[-1])
 
