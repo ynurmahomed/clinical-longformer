@@ -40,7 +40,6 @@ class DAN(pl.LightningModule):
         embed_dim,
         labels,
         hparams,
-        loss=F.cross_entropy,
     ):
 
         super().__init__()
@@ -53,8 +52,6 @@ class DAN(pl.LightningModule):
         self.weight_decay = hparams["weight_decay"]
         self.p = hparams["p"]
         self.hparams = hparams
-
-        self.loss = loss
 
         if vectors is not None:
             pre_trained = vectors(vocab.itos)
@@ -70,7 +67,9 @@ class DAN(pl.LightningModule):
 
         self.feed_forward = nn.Sequential(*layers)
 
-        self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.LogSoftmax(dim=1)
+
+        self.nll_loss = F.nll_loss
 
         # Metrics
         pr_curve = torchmetrics.PrecisionRecallCurve(num_class)
@@ -122,7 +121,7 @@ class DAN(pl.LightningModule):
 
         preds = self(x, offsets)
 
-        loss = self.loss(preds, y)
+        loss = self.nll_loss(preds, y)
 
         return {"loss": loss, "preds": preds, "target": y}
 
@@ -146,7 +145,7 @@ class DAN(pl.LightningModule):
 
         preds = self(x, offsets)
 
-        loss = self.loss(preds, y)
+        loss = self.nll_loss(preds, y)
 
         return {"loss": loss, "preds": preds, "target": y}
 
