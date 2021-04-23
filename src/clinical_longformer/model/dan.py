@@ -20,10 +20,10 @@ EMBED_DIM = 300
 
 
 # Default hyperparameters
-LEARNING_RATE = 5e-2
-NUM_HIDDEN = 1
+LEARNING_RATE = 1e-2
+NUM_HIDDEN = 2
 W_DECAY = 1e-5
-WORD_DROPOUT = 0.5
+WORD_DROPOUT = 0.7
 
 
 class DAN(pl.LightningModule):
