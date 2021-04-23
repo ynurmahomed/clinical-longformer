@@ -1,0 +1,23 @@
+#PBS -l select=1:ncpus=10:ngpus=1
+#PBS -P CSCI1335
+#PBS -q gpu_1
+#PBS -o /mnt/lustre/users/ynurmahomed/DAN-grid-search/out
+#PBS -e /mnt/lustre/users/ynurmahomed/DAN-grid-search/err
+#PBS -l walltime=12:00:00
+#PBS -WMail_Users=nrmyas001@myuct.ac.za
+
+module load chpc/python/3.7.0
+cd clinical-longformer
+source .venv/bin/activate
+
+for lr in 1e-1 1e-2 1e-3; do
+    for hd in 100 150 200; do
+        ipython -m src.clinical_longformer.model.lstm -- \
+            discharge/-1 \
+            --num_workers=6 \
+            --gpus=1 \
+            --max_epochs=10 \
+            --lr=$lr --hidden_dim=$hd \
+            --checkpoint_callback=False
+    done;
+done;

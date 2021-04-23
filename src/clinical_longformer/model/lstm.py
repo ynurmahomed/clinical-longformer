@@ -4,6 +4,7 @@ import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchmetrics
 
 from argparse import ArgumentParser
 from pathlib import Path
@@ -11,9 +12,10 @@ from torchtext.experimental.vectors import GloVe
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
+from .utils import macro_auc_pr, plot_confusion_matrix, plot_pr_curve
 
 
-BATCH_SIZE = 50
+BATCH_SIZE = 64
 EMBED_DIM = 300
 HIDDEN_DIM = 150
 
@@ -22,9 +24,7 @@ LEARNING_RATE = 1e-3
 
 
 class LSTMClassifier(pl.LightningModule):
-    def __init__(
-        self, vectors, vocab, embed_dim, labels, hparams, loss=F.cross_entropy
-    ):
+    def __init__(self, vectors, vocab, embed_dim, labels, hparams):
         super().__init__()
 
         self.labels = labels
@@ -33,8 +33,6 @@ class LSTMClassifier(pl.LightningModule):
         hidden_dim = hparams["hidden_dim"]
         self.lr = hparams["lr"]
         self.hparams = hparams
-
-        self.loss = loss
 
         if vectors is not None:
             pre_trained = vectors(vocab.itos)
@@ -46,7 +44,18 @@ class LSTMClassifier(pl.LightningModule):
 
         self.linear = nn.Linear(hidden_dim, num_class)
 
-        self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.LogSoftmax(dim=1)
+
+        self.nll_loss = F.nll_loss
+
+        # Metrics
+        pr_curve = torchmetrics.PrecisionRecallCurve(num_class)
+
+        self.train_pr_curve = pr_curve.clone()
+        self.valid_pr_curve = pr_curve.clone()
+        self.test_pr_curve = pr_curve.clone()
+
+        self.confmat = torchmetrics.ConfusionMatrix(num_class, normalize="true")
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -65,7 +74,7 @@ class LSTMClassifier(pl.LightningModule):
 
         embedding = self.embedding(x)
 
-        out, hidden = self.lstm(embedding)
+        out, _ = self.lstm(embedding)
 
         linear = self.linear(out[-1])
 
@@ -73,21 +82,30 @@ class LSTMClassifier(pl.LightningModule):
 
         return softmax
 
+    def on_train_start(self):
+        self.logger.log_hyperparams(self.hparams, {"AUC-PR (macro)/valid": 0})
+
     def training_step(self, batch, batch_idx):
 
         y, x = batch
 
         preds = self(x)
 
-        loss = self.loss(preds, y)
+        loss = self.nll_loss(preds, y)
 
-        return {"loss": loss, "preds": preds, "target": y}
+        return {"loss": loss, "preds": preds.detach(), "target": y}
 
     def training_step_end(self, outputs):
 
         loss = outputs["loss"]
 
+        precision, recall, _ = self.train_pr_curve(outputs["preds"], outputs["target"])
+
+        auc_pr = macro_auc_pr(precision, recall)
+
         self.log("Loss/train", loss)
+
+        self.log("AUC-PR (macro)/train", auc_pr)
 
         return loss
 
@@ -97,13 +115,19 @@ class LSTMClassifier(pl.LightningModule):
 
         preds = self(x)
 
-        loss = self.loss(preds, y)
+        loss = self.nll_loss(preds, y)
 
-        return {"loss": loss, "preds": preds, "target": y}
+        return {"loss": loss, "preds": preds.detach(), "target": y}
 
     def validation_step_end(self, outputs):
 
         loss = outputs["loss"]
+
+        precision, recall, _ = self.valid_pr_curve(outputs["preds"], outputs["target"])
+
+        auc_pr = macro_auc_pr(precision, recall)
+
+        self.log("AUC-PR (macro)/valid", auc_pr)
 
         self.log("Loss/valid", loss)
 
@@ -115,15 +139,41 @@ class LSTMClassifier(pl.LightningModule):
 
         preds = self(x)
 
-        loss = self.loss(preds, y)
+        loss = self.nll_loss(preds, y)
 
-        return {"loss": loss, "preds": preds, "target": y}
+        return {"preds": preds.detach(), "target": y}
 
     def test_epoch_end(self, outputs):
 
-        loss = outputs[0]["loss"]
+        y = torch.cat([o["target"] for o in outputs])
 
-        self.log("Loss/test", loss)
+        preds = torch.cat([o["preds"] for o in outputs])
+
+        self.log_pr_curve(preds, y)
+
+        self.log_confusion_matrix(preds.argmax(1), y)
+
+    def log_pr_curve(self, preds, y):
+
+        precision, recall, _ = self.test_pr_curve(preds, y)
+
+        fig = plot_pr_curve(precision, recall, self.labels)
+
+        auc_pr = macro_auc_pr(precision, recall)
+
+        self.log("AUC-PR (macro)/test", auc_pr)
+
+        self.logger.experiment.add_figure("PR Curve/test", fig, self.current_epoch)
+
+    def log_confusion_matrix(self, preds, y):
+
+        cm = self.confmat(preds, y)
+
+        fig = plot_confusion_matrix(cm, self.labels, self.labels)
+
+        self.logger.experiment.add_figure(
+            "Confusion Matrix/test", fig, self.current_epoch
+        )
 
     def configure_optimizers(self):
         return torch.optim.Adagrad(self.parameters(), lr=self.lr)
@@ -131,8 +181,7 @@ class LSTMClassifier(pl.LightningModule):
 
 def get_data_module(args):
     p = Path(args.mimic_path)
-    # dm = MIMICIIIDataModule(p, BATCH_SIZE, args.num_workers, pad_batch=True)
-    dm = AGNNewsDataModule(BATCH_SIZE, args.num_workers, pad_batch=True)
+    dm = MIMICIIIDataModule(p, BATCH_SIZE, args.num_workers, pad_batch=True)
     dm.setup()
     return dm
 
