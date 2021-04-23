@@ -9,6 +9,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from torchtext.experimental.vectors import GloVe
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.profiler import PyTorchProfiler
 
 from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
 
@@ -189,7 +190,9 @@ def main(args):
         "lightning_logs", name="LSTM", default_hp_metric=False, log_graph=True
     )
 
-    trainer = pl.Trainer.from_argparse_args(args, logger=logger)
+    profiler = PyTorchProfiler(profile_memory=True)
+
+    trainer = pl.Trainer.from_argparse_args(args, logger=logger, profiler=profiler)
 
     set_example_input_array(dm, model)
 
