@@ -214,6 +214,13 @@ def parse_args(args):
         default=0,
     )
 
+    parser.add_argument(
+        "--logdir",
+        help="Where to store pytorch lightning logs",
+        type=str,
+        default="lightning_logs",
+    )
+
     parser = LSTMClassifier.add_model_specific_args(parser)
 
     parser = pl.Trainer.add_argparse_args(
@@ -238,7 +245,7 @@ def main(args):
     model = LSTMClassifier(vectors, dm.vocab, dm.labels, hparams)
 
     logger = TensorBoardLogger(
-        "lightning_logs", name="LSTM", default_hp_metric=False, log_graph=True
+        args.logdir, name="LSTM", default_hp_metric=False, log_graph=True
     )
 
     trainer = pl.Trainer.from_argparse_args(args, logger=logger)
