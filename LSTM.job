@@ -15,6 +15,7 @@ for lr in 1e-1 1e-2 1e-3; do
         ipython -m src.clinical_longformer.model.lstm -- \
             discharge/-1 \
             --num_workers=6 \
+            --logdir=/home/ynurmahomed/lustre/lightning_logs \
             --gpus=1 \
             --max_epochs=10 \
             --lr=$lr --hidden_dim=$hd \
