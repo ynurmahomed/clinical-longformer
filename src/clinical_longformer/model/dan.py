@@ -15,15 +15,14 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
 from .utils import macro_auc_pr, plot_pr_curve, plot_confusion_matrix
 
-BATCH_SIZE = 50
-EMBED_DIM = 300
-
 
 # Default hyperparameters
 LEARNING_RATE = 1e-2
 NUM_HIDDEN = 2
 W_DECAY = 1e-5
 WORD_DROPOUT = 0.7
+BATCH_SIZE = 50
+EMBED_DIM = 300
 
 
 class DAN(pl.LightningModule):
@@ -37,7 +36,6 @@ class DAN(pl.LightningModule):
         self,
         vectors,
         vocab,
-        embed_dim,
         labels,
         hparams,
     ):
@@ -48,6 +46,7 @@ class DAN(pl.LightningModule):
 
         num_class = len(labels)
 
+        embed_dim = hparams["embed_dim"]
         self.lr = hparams["lr"]
         self.weight_decay = hparams["weight_decay"]
         self.p = hparams["p"]
@@ -87,6 +86,10 @@ class DAN(pl.LightningModule):
         parser.add_argument("--num_hidden", type=int, default=NUM_HIDDEN)
         parser.add_argument("--weight_decay", type=float, default=W_DECAY)
         parser.add_argument("--p", type=float, default=WORD_DROPOUT)
+        parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
+        parser.add_argument(
+            "--embed_dim", type=int, default=EMBED_DIM, choices=[50, 100, 200, 300] # GloVe
+        )
         return parent_parser
 
     @staticmethod
@@ -94,7 +97,8 @@ class DAN(pl.LightningModule):
         hparams = vars(namespace)
         return {
             k: hparams[k]
-            for k in hparams.keys() & {"lr", "num_hidden", "weight_decay", "p"}
+            for k in hparams.keys()
+            & {"lr", "num_hidden", "weight_decay", "p", "batch_size", "embed_dim"}
         }
 
     def forward(self, x, offsets):
@@ -211,7 +215,7 @@ class DAN(pl.LightningModule):
 
 def get_data_module(args):
     p = Path(args.mimic_path)
-    dm = MIMICIIIDataModule(p, BATCH_SIZE, args.num_workers)
+    dm = MIMICIIIDataModule(p, args.batch_size, args.num_workers)
     dm.setup()
     return dm
 
@@ -268,7 +272,7 @@ def main(args):
     else:
         vectors = GloVe(name="6B", dim=EMBED_DIM)
 
-    model = DAN(vectors, dm.vocab, EMBED_DIM, dm.labels, DAN.get_model_hparams(args))
+    model = DAN(vectors, dm.vocab, dm.labels, DAN.get_model_hparams(args))
 
     logger = TensorBoardLogger(
         args.logdir, name="DAN", default_hp_metric=False, log_graph=True
