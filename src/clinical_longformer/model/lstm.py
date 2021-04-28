@@ -15,16 +15,15 @@ from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
 from .utils import macro_auc_pr, plot_confusion_matrix, plot_pr_curve
 
 
-BATCH_SIZE = 64
-EMBED_DIM = 300
-HIDDEN_DIM = 150
-
 # Default hyperparameters
 LEARNING_RATE = 1e-3
+HIDDEN_DIM = 150
+BATCH_SIZE = 64
+EMBED_DIM = 300
 
 
 class LSTMClassifier(pl.LightningModule):
-    def __init__(self, vectors, vocab, embed_dim, labels, hparams):
+    def __init__(self, vectors, vocab, labels, hparams):
         super().__init__()
 
         self.labels = labels
@@ -38,9 +37,9 @@ class LSTMClassifier(pl.LightningModule):
             pre_trained = vectors(vocab.itos)
             self.embedding = nn.Embedding.from_pretrained(pre_trained)
         else:
-            self.embedding = nn.Embedding(len(vocab), embed_dim)
+            self.embedding = nn.Embedding(len(vocab), hparams["embed_dim"])
 
-        self.lstm = nn.LSTM(embed_dim, hidden_dim)
+        self.lstm = nn.LSTM(hparams["embed_dim"], hidden_dim)
 
         self.linear = nn.Linear(hidden_dim, num_class)
 
@@ -62,12 +61,16 @@ class LSTMClassifier(pl.LightningModule):
         parser = parent_parser.add_argument_group("DAN")
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
         parser.add_argument("--hidden_dim", type=int, default=HIDDEN_DIM)
+        parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
+        parser.add_argument(
+            "--embed_dim", type=int, default=EMBED_DIM, choices=[50, 100, 200, 300]
+        )
         return parent_parser
 
     @staticmethod
     def get_model_hparams(namespace):
         hparams = vars(namespace)
-        want_keys = {"lr", "hidden_dim"}
+        want_keys = {"lr", "hidden_dim", "batch_size", "embed_dim"}
         return {k: hparams[k] for k in hparams.keys() & want_keys}
 
     def forward(self, x):
@@ -181,7 +184,7 @@ class LSTMClassifier(pl.LightningModule):
 
 def get_data_module(args):
     p = Path(args.mimic_path)
-    dm = MIMICIIIDataModule(p, BATCH_SIZE, args.num_workers, pad_batch=True)
+    dm = MIMICIIIDataModule(p, args.batch_size, args.num_workers, pad_batch=True)
     dm.setup()
     return dm
 
@@ -229,10 +232,10 @@ def main(args):
     if args.no_vectors:
         vectors = None
     else:
-        vectors = GloVe(name="6B", dim=EMBED_DIM)
+        vectors = GloVe(name="6B", dim=args.embed_dim)
 
     hparams = LSTMClassifier.get_model_hparams(args)
-    model = LSTMClassifier(vectors, dm.vocab, EMBED_DIM, dm.labels, hparams)
+    model = LSTMClassifier(vectors, dm.vocab, dm.labels, hparams)
 
     logger = TensorBoardLogger(
         "lightning_logs", name="LSTM", default_hp_metric=False, log_graph=True
