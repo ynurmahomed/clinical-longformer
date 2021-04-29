@@ -68,7 +68,7 @@ class MIMICIIIDataModule(pl.LightningDataModule):
             tokenizer, vocab_func(self.vocab), totensor(torch.long)
         )
 
-        label_transform = totensor(torch.long)
+        label_transform = totensor(torch.float)
 
         transforms = (label_transform, token_transform)
 

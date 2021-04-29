@@ -13,7 +13,13 @@ from torchtext.experimental.vectors import GloVe
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
-from .utils import macro_auc_pr, plot_pr_curve, plot_confusion_matrix
+from .utils import (
+    auc_pr,
+    macro_auc_pr,
+    plot_pr_curve,
+    plot_single_pr_curve,
+    plot_confusion_matrix,
+)
 
 
 # Default hyperparameters
@@ -44,8 +50,6 @@ class DAN(pl.LightningModule):
 
         self.labels = labels
 
-        num_class = len(labels)
-
         embed_dim = hparams["embed_dim"]
         self.lr = hparams["lr"]
         self.weight_decay = hparams["weight_decay"]
@@ -62,22 +66,22 @@ class DAN(pl.LightningModule):
         for _ in range(hparams["num_hidden"]):
             layers.append(nn.Linear(embed_dim, embed_dim))
             layers.append(nn.ReLU())
-        layers.append(nn.Linear(embed_dim, num_class))
+        layers.append(nn.Linear(embed_dim, 1))
 
         self.feed_forward = nn.Sequential(*layers)
 
-        self.softmax = nn.LogSoftmax(dim=1)
+        self.sigmoid = nn.Sigmoid()
 
-        self.nll_loss = F.nll_loss
+        self.bce_loss = F.binary_cross_entropy
 
         # Metrics
-        pr_curve = torchmetrics.PrecisionRecallCurve(num_class)
+        pr_curve = torchmetrics.PrecisionRecallCurve()
 
         self.train_pr_curve = pr_curve.clone()
         self.valid_pr_curve = pr_curve.clone()
         self.test_pr_curve = pr_curve.clone()
 
-        self.confmat = torchmetrics.ConfusionMatrix(num_class, normalize="true")
+        self.confmat = torchmetrics.ConfusionMatrix(2, normalize="true")
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -88,7 +92,10 @@ class DAN(pl.LightningModule):
         parser.add_argument("--p", type=float, default=WORD_DROPOUT)
         parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
         parser.add_argument(
-            "--embed_dim", type=int, default=EMBED_DIM, choices=[50, 100, 200, 300] # GloVe
+            "--embed_dim",
+            type=int,
+            default=EMBED_DIM,
+            choices=[50, 100, 200, 300],  # GloVe
         )
         return parent_parser
 
@@ -112,20 +119,20 @@ class DAN(pl.LightningModule):
 
         ff = self.feed_forward(embedded)
 
-        softmax = self.softmax(ff)
+        sigmoid = self.sigmoid(ff)
 
-        return softmax
+        return sigmoid
 
     def on_train_start(self):
-        self.logger.log_hyperparams(self.hparams, {"AUC-PR (macro)/valid": 0})
+        self.logger.log_hyperparams(self.hparams, {"AUC-PR/valid": 0})
 
     def training_step(self, batch, batch_idx):
 
         y, x, offsets = batch
 
-        preds = self(x, offsets)
+        preds = self(x, offsets).view(-1)
 
-        loss = self.nll_loss(preds, y)
+        loss = self.bce_loss(preds, y)
 
         return {"loss": loss, "preds": preds, "target": y}
 
@@ -135,9 +142,7 @@ class DAN(pl.LightningModule):
 
         precision, recall, _ = self.train_pr_curve(outputs["preds"], outputs["target"])
 
-        auc_pr = macro_auc_pr(precision, recall)
-
-        self.log("AUC-PR (macro)/train", auc_pr)
+        self.log("AUC-PR/train", auc_pr(precision, recall))
 
         self.log("Loss/train", loss)
 
@@ -147,9 +152,9 @@ class DAN(pl.LightningModule):
 
         y, x, offsets = batch
 
-        preds = self(x, offsets)
+        preds = self(x, offsets).view(-1)
 
-        loss = self.nll_loss(preds, y)
+        loss = self.bce_loss(preds, y)
 
         return {"loss": loss, "preds": preds, "target": y}
 
@@ -159,9 +164,7 @@ class DAN(pl.LightningModule):
 
         precision, recall, _ = self.valid_pr_curve(outputs["preds"], outputs["target"])
 
-        auc_pr = macro_auc_pr(precision, recall)
-
-        self.log("AUC-PR (macro)/valid", auc_pr)
+        self.log("AUC-PR/valid", auc_pr(precision, recall))
 
         self.log("Loss/valid", loss)
 
@@ -171,7 +174,7 @@ class DAN(pl.LightningModule):
 
         y, x, offsets = batch
 
-        preds = self(x, offsets)
+        preds = self(x, offsets).view(-1)
 
         return {"preds": preds, "target": y}
 
@@ -183,23 +186,21 @@ class DAN(pl.LightningModule):
 
         self.log_pr_curve(preds, y)
 
-        self.log_confusion_matrix(preds.argmax(1), y)
+        self.log_confusion_matrix(preds, y)
 
     def log_pr_curve(self, preds, y):
 
         precision, recall, _ = self.test_pr_curve(preds, y)
 
-        fig = plot_pr_curve(precision, recall, self.labels)
+        fig = plot_single_pr_curve(precision, recall)
 
-        auc_pr = macro_auc_pr(precision, recall)
-
-        self.log("AUC-PR (macro)/test", auc_pr)
+        self.log("AUC-PR/test", auc_pr(precision, recall))
 
         self.logger.experiment.add_figure("PR Curve/test", fig, self.current_epoch)
 
     def log_confusion_matrix(self, preds, y):
 
-        cm = self.confmat(preds, y)
+        cm = self.confmat(preds, y.int())
 
         fig = plot_confusion_matrix(cm, self.labels, self.labels)
 
