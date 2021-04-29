@@ -8,7 +8,7 @@ from collections import Counter
 from pathlib import Path
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Sampler
-from torchtext.experimental.datasets import AG_NEWS
+from torchtext.experimental.datasets import AG_NEWS, YelpReviewPolarity
 from torchtext.experimental.datasets.text_classification import (
     build_vocab,
     TextClassificationDataset,
@@ -164,6 +164,92 @@ class AGNNewsDataModule(pl.LightningDataModule):
         self.test = test
 
         self.label_transform = lambda l: int(l) - 1
+
+        self.text_transform = lambda t: t
+
+    def collate_fn(self, batch):
+        label_list, text_list, offsets = [], [], [0]
+
+        for (_label, _text) in batch:
+
+            label_list.append(self.label_transform(_label))
+
+            processed_text = self.text_transform(_text)
+            text_list.append(processed_text)
+            offsets.append(processed_text.size(0))
+
+        return (
+            torch.tensor(label_list),
+            torch.cat(text_list),
+            torch.tensor(offsets[:-1]).cumsum(dim=0),
+        )
+
+    def collate_padded(self, batch):
+        label_list, text_list = [], []
+        for (_label, _text) in batch:
+            label_list.append(self.label_transform(_label))
+            text_list.append(self.text_transform(_text))
+        return torch.tensor(label_list), pad_sequence(text_list)
+
+    def get_dataloader(self, dataset, shuffle=False):
+
+        if self.pad_batch:
+            batch_sampler = BatchRandomPooledSampler(dataset, self.batch_size)
+            collate_fn = self.collate_padded
+            return DataLoader(
+                dataset,
+                batch_sampler=batch_sampler,
+                collate_fn=collate_fn,
+                num_workers=self.num_workers,
+            )
+        else:
+            collate_fn = self.collate_fn
+            return DataLoader(
+                dataset,
+                self.batch_size,
+                collate_fn=collate_fn,
+                num_workers=self.num_workers,
+                shuffle=shuffle,
+            )
+
+    def train_dataloader(self):
+        return self.get_dataloader(self.train, shuffle=True)
+
+    def val_dataloader(self):
+        return self.get_dataloader(self.valid)
+
+    def test_dataloader(self):
+        return self.get_dataloader(self.test)
+
+
+class YelpReviewPolarityDataModule(pl.LightningDataModule):
+    def __init__(self, batch_size, num_workers, pad_batch=False):
+
+        super().__init__()
+
+        self.batch_size = batch_size
+
+        self.num_workers = num_workers
+
+        self.pad_batch = pad_batch
+
+    def setup(self):
+
+        train, test = YelpReviewPolarity()
+
+        self.vocab = train.get_vocab()
+
+        self.labels = ["Positive", "Negative"]
+
+        self.train = train
+
+        self.valid = test
+
+        self.test = test
+
+        self.label_transform = sequential_transforms(
+            lambda l: int(l) - 1, totensor(torch.float)
+        )
 
         self.text_transform = lambda t: t
 
