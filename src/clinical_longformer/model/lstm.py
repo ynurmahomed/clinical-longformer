@@ -11,8 +11,8 @@ from pathlib import Path
 from torchtext.experimental.vectors import GloVe
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from ..data.module import AGNNewsDataModule, MIMICIIIDataModule
-from .utils import macro_auc_pr, plot_confusion_matrix, plot_pr_curve
+from ..data.module import YelpReviewPolarityDataModule, MIMICIIIDataModule
+from .utils import auc_pr, plot_confusion_matrix, plot_pr_curve, plot_single_pr_curve
 
 
 # Default hyperparameters
@@ -27,7 +27,6 @@ class LSTMClassifier(pl.LightningModule):
         super().__init__()
 
         self.labels = labels
-        num_class = len(labels)
 
         hidden_dim = hparams["hidden_dim"]
         self.lr = hparams["lr"]
@@ -41,20 +40,20 @@ class LSTMClassifier(pl.LightningModule):
 
         self.lstm = nn.LSTM(hparams["embed_dim"], hidden_dim)
 
-        self.linear = nn.Linear(hidden_dim, num_class)
+        self.linear = nn.Linear(hidden_dim, 1)
 
-        self.softmax = nn.LogSoftmax(dim=1)
+        self.sigmoid = nn.Sigmoid()
 
-        self.nll_loss = F.nll_loss
+        self.bce_loss = F.binary_cross_entropy
 
         # Metrics
-        pr_curve = torchmetrics.PrecisionRecallCurve(num_class)
+        pr_curve = torchmetrics.PrecisionRecallCurve()
 
         self.train_pr_curve = pr_curve.clone()
         self.valid_pr_curve = pr_curve.clone()
         self.test_pr_curve = pr_curve.clone()
 
-        self.confmat = torchmetrics.ConfusionMatrix(num_class, normalize="true")
+        self.confmat = torchmetrics.ConfusionMatrix(2, normalize="true")
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -81,20 +80,20 @@ class LSTMClassifier(pl.LightningModule):
 
         linear = self.linear(out[-1])
 
-        softmax = self.softmax(linear)
+        sigmoid = self.sigmoid(linear)
 
-        return softmax
+        return sigmoid
 
     def on_train_start(self):
-        self.logger.log_hyperparams(self.hparams, {"AUC-PR (macro)/valid": 0})
+        self.logger.log_hyperparams(self.hparams, {"AUC-PR/valid": 0})
 
     def training_step(self, batch, batch_idx):
 
         y, x = batch
 
-        preds = self(x)
+        preds = self(x).view(-1)
 
-        loss = self.nll_loss(preds, y)
+        loss = self.bce_loss(preds, y)
 
         return {"loss": loss, "preds": preds.detach(), "target": y}
 
@@ -104,11 +103,9 @@ class LSTMClassifier(pl.LightningModule):
 
         precision, recall, _ = self.train_pr_curve(outputs["preds"], outputs["target"])
 
-        auc_pr = macro_auc_pr(precision, recall)
-
         self.log("Loss/train", loss)
 
-        self.log("AUC-PR (macro)/train", auc_pr)
+        self.log("AUC-PR/train", auc_pr(precision, recall))
 
         return loss
 
@@ -116,9 +113,9 @@ class LSTMClassifier(pl.LightningModule):
 
         y, x = batch
 
-        preds = self(x)
+        preds = self(x).view(-1)
 
-        loss = self.nll_loss(preds, y)
+        loss = self.bce_loss(preds, y)
 
         return {"loss": loss, "preds": preds.detach(), "target": y}
 
@@ -128,9 +125,7 @@ class LSTMClassifier(pl.LightningModule):
 
         precision, recall, _ = self.valid_pr_curve(outputs["preds"], outputs["target"])
 
-        auc_pr = macro_auc_pr(precision, recall)
-
-        self.log("AUC-PR (macro)/valid", auc_pr)
+        self.log("AUC-PR/valid", auc_pr(precision, recall))
 
         self.log("Loss/valid", loss)
 
@@ -140,9 +135,9 @@ class LSTMClassifier(pl.LightningModule):
 
         y, x = batch
 
-        preds = self(x)
+        preds = self(x).view(-1)
 
-        loss = self.nll_loss(preds, y)
+        loss = self.bce_loss(preds, y)
 
         return {"preds": preds.detach(), "target": y}
 
@@ -154,23 +149,21 @@ class LSTMClassifier(pl.LightningModule):
 
         self.log_pr_curve(preds, y)
 
-        self.log_confusion_matrix(preds.argmax(1), y)
+        self.log_confusion_matrix(preds, y)
 
     def log_pr_curve(self, preds, y):
 
         precision, recall, _ = self.test_pr_curve(preds, y)
 
-        fig = plot_pr_curve(precision, recall, self.labels)
+        fig = plot_single_pr_curve(precision, recall)
 
-        auc_pr = macro_auc_pr(precision, recall)
-
-        self.log("AUC-PR (macro)/test", auc_pr)
+        self.log("AUC-PR/test", auc_pr(precision, recall))
 
         self.logger.experiment.add_figure("PR Curve/test", fig, self.current_epoch)
 
     def log_confusion_matrix(self, preds, y):
 
-        cm = self.confmat(preds, y)
+        cm = self.confmat(preds, y.int())
 
         fig = plot_confusion_matrix(cm, self.labels, self.labels)
 
