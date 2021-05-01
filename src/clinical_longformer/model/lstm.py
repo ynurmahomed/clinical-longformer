@@ -11,8 +11,8 @@ from pathlib import Path
 from torchtext.experimental.vectors import GloVe
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from ..data.module import YelpReviewPolarityDataModule, MIMICIIIDataModule
-from .utils import auc_pr, plot_confusion_matrix, plot_pr_curve, plot_single_pr_curve
+from ..data.module import MIMICIIIDataModule, YelpReviewPolarityDataModule
+from .utils import auc_pr, plot_confusion_matrix, plot_pr_curve
 
 
 # Default hyperparameters
@@ -155,7 +155,7 @@ class LSTMClassifier(pl.LightningModule):
 
         precision, recall, _ = self.test_pr_curve(preds, y)
 
-        fig = plot_single_pr_curve(precision, recall)
+        fig = plot_pr_curve(precision, recall)
 
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
