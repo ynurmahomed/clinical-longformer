@@ -23,6 +23,8 @@ EMBED_DIM = 300
 
 
 class LSTMClassifier(pl.LightningModule):
+    """Bi-LSTM with global max-pooling.
+    """
     def __init__(self, vectors, vocab, labels, hparams):
         super().__init__()
 
@@ -38,9 +40,13 @@ class LSTMClassifier(pl.LightningModule):
         else:
             self.embedding = nn.Embedding(len(vocab), hparams["embed_dim"])
 
-        self.lstm = nn.LSTM(hparams["embed_dim"], hidden_dim)
+        self.lstm = nn.LSTM(hparams["embed_dim"], hidden_dim, bidirectional=True)
 
-        self.linear = nn.Linear(hidden_dim, 1)
+        # Global max pool
+        self.max_pool = nn.AdaptiveMaxPool1d(1)
+
+        # Double input size for bi-LSTM
+        self.linear = nn.Linear(2 * hidden_dim, 1)
 
         self.sigmoid = nn.Sigmoid()
 
@@ -78,7 +84,10 @@ class LSTMClassifier(pl.LightningModule):
 
         out, _ = self.lstm(embedding)
 
-        linear = self.linear(out[-1])
+        # Global max pool over the sequence length dimension
+        max_pool = self.max_pool(out.transpose(0,2))
+
+        linear = self.linear(max_pool.transpose(0,2))
 
         sigmoid = self.sigmoid(linear)
 
