@@ -1,8 +1,8 @@
 #PBS -l select=1:ncpus=10:ngpus=1
 #PBS -P CSCI1335
 #PBS -q gpu_1
-#PBS -o /mnt/lustre/users/ynurmahomed/DAN-grid-search/out
-#PBS -e /mnt/lustre/users/ynurmahomed/DAN-grid-search/err
+#PBS -o /mnt/lustre3p/users/ynurmahomed/dan-tune/out
+#PBS -e /mnt/lustre3p/users/ynurmahomed/dan-tune/err
 #PBS -l walltime=12:00:00
 #PBS -WMail_Users=nrmyas001@myuct.ac.za
 
@@ -17,7 +17,7 @@ for lr in 1e-3 5e-3 1e-2 5e-2 1e-1; do
                 ipython -m src.clinical_longformer.model.dan -- \
                     discharge/-1 \
                     --num_workers=6 \
-                    --logdir=/home/ynurmahomed/lustre/lightning_logs \
+                    --logdir=/mng/lustre3p/users/ynurmahomed/lightning_logs \
                     --gpus=1 \
                     --max_epochs=100 \
                     --lr=$lr --num_hidden=$num_hidden --weight_decay=$weight_decay --p=$p \

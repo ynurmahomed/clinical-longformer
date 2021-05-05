@@ -1,8 +1,8 @@
 #PBS -l select=1:ncpus=10:ngpus=1
 #PBS -P CSCI1335
 #PBS -q gpu_1
-#PBS -o /mnt/lustre/users/ynurmahomed/LSTM-grid-search/out
-#PBS -e /mnt/lustre/users/ynurmahomed/LSTM-grid-search/err
+#PBS -o /mnt/lustre3p/users/ynurmahomed/lstm-tune/out
+#PBS -e /mnt/lustre3p/users/ynurmahomed/lstm-tune/err
 #PBS -l walltime=07:00:00
 #PBS -WMail_Users=nrmyas001@myuct.ac.za
 
@@ -17,7 +17,7 @@ for lr in 1e-1 1e-2 1e-3; do
                 ipython -m src.clinical_longformer.model.lstm -- \
                     discharge/-1 \
                     --num_workers=6 \
-                    --logdir=/home/ynurmahomed/lustre/lightning_logs \
+                    --logdir=/mnt/lustre3p/users/ynurmahomed/lightning_logs \
                     --log_every_n_steps=10 \
                     --track_grad_norm=2 \
                     --gpus=1 \
