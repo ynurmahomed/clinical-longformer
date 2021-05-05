@@ -88,10 +88,16 @@ class LSTMClassifier(pl.LightningModule):
 
         out, _ = self.lstm(embedding)
 
-        # Global max pool over the sequence length dimension
-        max_pool = self.max_pool(out.transpose(0, 2))
+        # Swap sequence length and feature size dimensions
+        transpose = out.transpose(0, 2)
 
-        linear = self.linear(max_pool.transpose(0, 2))
+        # Global max pool over the sequence length dimension
+        max_pool = self.max_pool(transpose)
+
+        # Swap back seq length and feature size
+        transpose = max_pool.transpose(0, 2)
+
+        linear = self.linear(transpose)
 
         sigmoid = self.sigmoid(linear)
 
