@@ -15,7 +15,7 @@ for lr in 1e-3 5e-3 1e-2 5e-2 1e-1; do
         for weight_decay in 1e-6 1e-5 1e-4 1e-3; do
             for p in 0.3 0.5 0.7; do
                 ipython -m src.clinical_longformer.model.dan -- \
-                    discharge/-1 \
+                    /mnt/lustre3p/users/ynurmahomed/datasets/discharge/-1 \
                     --num_workers=6 \
                     --logdir=/mng/lustre3p/users/ynurmahomed/lightning_logs \
                     --gpus=1 \
