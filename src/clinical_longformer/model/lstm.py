@@ -185,7 +185,7 @@ class LSTMClassifier(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        return torch.optim.Adagrad(self.parameters(), lr=self.lr)
+        return torch.optim.Adam(self.parameters(), lr=self.lr)
 
 
 def get_data_module(args):
