@@ -17,7 +17,7 @@ for lr in 1e-3 5e-3 1e-2 5e-2 1e-1; do
                 ipython -m src.clinical_longformer.model.dan -- \
                     /mnt/lustre3p/users/ynurmahomed/datasets/discharge/-1 \
                     --num_workers=6 \
-                    --logdir=/mng/lustre3p/users/ynurmahomed/lightning_logs \
+                    --logdir=/mnt/lustre3p/users/ynurmahomed/lightning_logs \
                     --gpus=1 \
                     --max_epochs=100 \
                     --lr=$lr --num_hidden=$num_hidden --weight_decay=$weight_decay --p=$p \
