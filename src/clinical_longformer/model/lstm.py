@@ -11,7 +11,7 @@ from pathlib import Path
 from torchtext.experimental.vectors import GloVe
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from ..data.module import MIMICIIIDataModule, YelpReviewPolarityDataModule
+from ..data.module import MIMICIIIDataModule
 from .utils import auc_pr, plot_confusion_matrix, plot_pr_curve
 
 
