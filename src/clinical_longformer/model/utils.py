@@ -27,6 +27,9 @@ def plot_pr_curve(precision, recall):
 
     ax.legend([f"AUC {auc(recall, precision):.2f}"])
 
+    ax.set_xlim(-0.05, 1.05)
+    ax.set_ylim(-0.05, 1.05)
+
     fig = ax.get_figure()
     plt.close(fig)
 
