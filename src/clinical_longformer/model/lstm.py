@@ -20,7 +20,7 @@ LEARNING_RATE = 1e-3
 HIDDEN_DIM = 200
 BATCH_SIZE = 64
 EMBED_DIM = 300
-
+DROPOUT = 1e-1
 
 class LSTMClassifier(pl.LightningModule):
     """Bi-LSTM with global max-pooling."""
@@ -31,6 +31,7 @@ class LSTMClassifier(pl.LightningModule):
         self.labels = labels
 
         hidden_dim = hparams["hidden_dim"]
+        dropout = hparams["dropout"]
         self.lr = hparams["lr"]
         self.hparams = hparams
 
@@ -40,7 +41,7 @@ class LSTMClassifier(pl.LightningModule):
         else:
             self.embedding = nn.Embedding(len(vocab), hparams["embed_dim"])
 
-        self.lstm = nn.LSTM(hparams["embed_dim"], hidden_dim, bidirectional=True)
+        self.lstm = nn.LSTM(hparams["embed_dim"], hidden_dim, bidirectional=True, dropout=dropout)
 
         # Global max pool
         self.max_pool = nn.AdaptiveMaxPool1d(1)
@@ -74,12 +75,13 @@ class LSTMClassifier(pl.LightningModule):
         parser.add_argument(
             "--embed_dim", type=int, default=EMBED_DIM, choices=[50, 100, 200, 300]
         )
+        parser.add_argument("--dropout", type=float, default=DROPOUT)
         return parent_parser
 
     @staticmethod
     def get_model_hparams(namespace):
         hparams = vars(namespace)
-        want_keys = {"lr", "hidden_dim", "batch_size", "embed_dim"}
+        want_keys = {"lr", "hidden_dim", "batch_size", "embed_dim", "dropout"}
         return {k: hparams[k] for k in hparams.keys() & want_keys}
 
     def forward(self, x):
