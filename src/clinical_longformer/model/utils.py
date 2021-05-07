@@ -18,7 +18,7 @@ def plot_pr_curve(precision, recall):
 
     sns.set_theme()
 
-    d = {"Precision": precision.detach(), "Recall": recall.detach()}
+    d = {"Precision": precision.cpu(), "Recall": recall.cpu()}
     df = pd.DataFrame(d)
 
     plt.figure(figsize=(10, 7))
@@ -40,7 +40,7 @@ def plot_confusion_matrix(confmat, index, columns):
 
     sns.set_theme()
 
-    df = pd.DataFrame(confmat.detach().numpy(), index=index, columns=columns)
+    df = pd.DataFrame(confmat.cpu().numpy(), index=index, columns=columns)
 
     plt.figure(figsize=(10, 7))
     fig = sns.heatmap(df, annot=True, cmap="Spectral").get_figure()
