@@ -16,8 +16,8 @@ from .utils import auc_pr, plot_confusion_matrix, plot_pr_curve
 
 
 # Default hyperparameters
-LEARNING_RATE = 1e-2
-HIDDEN_DIM = 100
+LEARNING_RATE = 1e-3
+HIDDEN_DIM = 200
 BATCH_SIZE = 64
 EMBED_DIM = 300
 
