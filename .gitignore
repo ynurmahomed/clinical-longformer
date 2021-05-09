@@ -60,3 +60,6 @@ venv*/
 
 # Pytorch lightning
 lightning_logs
+
+# Ray tune
+ray_results

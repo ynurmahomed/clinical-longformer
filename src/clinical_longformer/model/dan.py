@@ -208,11 +208,15 @@ class DAN(pl.LightningModule):
         )
 
 
-def get_data_module(args):
-    p = Path(args.mimic_path)
-    dm = MIMICIIIDataModule(p, args.batch_size, args.num_workers)
+def get_data_module(mimic_path, batch_size, num_workers):
+    p = Path(mimic_path)
+    dm = MIMICIIIDataModule(p, batch_size, num_workers)
     dm.setup()
     return dm
+
+
+def get_vectors(dim, root):
+    return GloVe(name="6B", dim=dim, root=root)
 
 
 def set_example_input_array(datamodule, model):
@@ -220,7 +224,7 @@ def set_example_input_array(datamodule, model):
     model.example_input_array = [x, offsets]
 
 
-def parse_args(args):
+def add_arguments():
 
     parser = ArgumentParser()
 
@@ -247,25 +251,34 @@ def parse_args(args):
         default="lightning_logs",
     )
 
+    parser.add_argument(
+        "--vectors_root",
+        help="Where pre-trained vectors are stored",
+        type=str,
+        default=".data",
+    )
+
     parser = DAN.add_model_specific_args(parser)
 
     parser = pl.Trainer.add_argparse_args(
         parser.add_argument_group(title="pl.Trainer args")
     )
 
-    return parser.parse_args(args)
+    return parser
 
 
 def main(args):
 
-    args = parse_args(args)
+    parser = add_arguments()
 
-    dm = get_data_module(args)
+    args = parser.parse_args(args)
+
+    dm = get_data_module(args.mimic_path, args.batch_size, args.num_workers)
 
     if args.no_vectors:
         vectors = None
     else:
-        vectors = GloVe(name="6B", dim=EMBED_DIM)
+        vectors = get_vectors(args.embed_dim, args.vectors_root)
 
     model = DAN(vectors, dm.vocab, dm.labels, DAN.get_model_hparams(args))
 
