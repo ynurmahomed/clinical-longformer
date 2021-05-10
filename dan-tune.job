@@ -12,7 +12,7 @@ source .venv/bin/activate
 
 ipython -m src.clinical_longformer.tune.dan -- \
     /mnt/lustre3p/users/ynurmahomed/datasets/discharge/-1 \
-    --vectors_root=/mnt/lustre3p/users/ynurmahomed/clinical_longformer/.data \
+    --vectors_root=/mnt/lustre3p/users/ynurmahomed/.data \
     --local_dir=/mnt/lustre3p/users/ynurmahomed/ray_results \
     --num_samples=100 \
     --max_epochs=10 \
