@@ -10,21 +10,11 @@ module load chpc/python/3.7.0
 cd /mnt/lustre3p/users/ynurmahomed/clinical-longformer
 source .venv/bin/activate
 
-for lr in 1e-1 1e-2 1e-3; do
-    for hd in 100 150 200; do
-        for bs in 32 64 128; do
-            for ed in 50 100 200 300; do
-                ipython -m src.clinical_longformer.model.lstm -- \
-                    /mnt/lustre3p/users/ynurmahomed/datasets/discharge/-1 \
-                    --num_workers=6 \
-                    --logdir=/mnt/lustre3p/users/ynurmahomed/lightning_logs \
-                    --log_every_n_steps=10 \
-                    --track_grad_norm=2 \
-                    --gpus=1 \
-                    --max_epochs=10 \
-                    --lr=$lr --hidden_dim=$hd --batch_size=$bs --embed_dim=$ed \
-                    --checkpoint_callback=False;
-            done;
-        done;
-    done;
-done;
+ipython -m src.clinical_longformer.tune.lstm -- \
+    /mnt/lustre3p/users/ynurmahomed/datasets/discharge/-1 \
+    --vectors_root=/mnt/lustre3p/users/ynurmahomed/.data \
+    --local_dir=/mnt/lustre3p/users/ynurmahomed/ray_results \
+    --num_samples=100 \
+    --max_epochs=2 \
+    --num_workers=6 \
+    --gpus=1

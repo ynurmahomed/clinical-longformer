@@ -1,23 +1,18 @@
-import logging
 import math
 import pytorch_lightning as pl
-import os
-import ray
 import sys
 import torch
 
-from argparse import ArgumentParser
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 from ray import tune
+import ray
 from ray.tune import CLIReporter
-from ray.tune.schedulers import ASHAScheduler, PopulationBasedTraining
-from ray.tune.integration.pytorch_lightning import (
-    TuneReportCallback,
-    TuneReportCheckpointCallback,
-)
+from ray.tune.integration.pytorch_lightning import TuneReportCallback
+from ray.tune.schedulers import ASHAScheduler
 
-from ..model.dan import DAN, get_data_module, get_vectors, add_arguments
+from ..model.lstm import LSTMClassifier, get_data_module, get_vectors, add_arguments
 from .utils import trial_name_string
+
 
 def train_tune(config, mimic_path, vectors_root, num_workers, max_epochs, gpus, logdir):
 
@@ -25,9 +20,11 @@ def train_tune(config, mimic_path, vectors_root, num_workers, max_epochs, gpus, 
 
     vectors = get_vectors(config["embed_dim"], vectors_root)
 
-    model = DAN(vectors, dm.vocab, dm.labels, config)
+    model = LSTMClassifier(vectors, dm.vocab, dm.labels, config)
 
-    logger = TensorBoardLogger(tune.get_trial_dir(), name="", version=".", default_hp_metric=False)
+    logger = TensorBoardLogger(
+        tune.get_trial_dir(), name="", version=".", default_hp_metric=False
+    )
 
     tune_callback = TuneReportCallback(
         {"loss": "Loss/valid", "AUC-PR": "AUC-PR/valid"}, on="validation_end"
@@ -43,15 +40,14 @@ def train_tune(config, mimic_path, vectors_root, num_workers, max_epochs, gpus, 
     trainer.fit(model, datamodule=dm)
 
 
-def tune_dan(args):
+def tune_lstm(args):
 
     config = {
         "lr": tune.loguniform(1e-4, 1e-1),
-        "num_hidden": tune.choice([1, 2, 3]),
-        "weight_decay": tune.loguniform(1e-7, 1e-5),
-        "p": tune.loguniform(0.3, 0.7),
+        "hidden_dim": tune.choice([100, 200, 300]),
         "batch_size": tune.choice([32, 64, 128]),
         "embed_dim": tune.choice([50, 100, 200, 300]),
+        "dropout": tune.loguniform(0.3, 0.7),
     }
 
     scheduler = ASHAScheduler(max_t=args.max_epochs, grace_period=1, reduction_factor=2)
@@ -59,11 +55,10 @@ def tune_dan(args):
     reporter = CLIReporter(
         parameter_columns=[
             "lr",
-            "num_hidden",
-            "weight_decay",
-            "p",
+            "hidden_dim",
             "batch_size",
             "embed_dim",
+            "dropout",
         ],
         metric_columns=["loss", "AUC-PR", "training_iteration"],
     )
@@ -88,7 +83,7 @@ def tune_dan(args):
         scheduler=scheduler,
         progress_reporter=reporter,
         local_dir=args.local_dir,
-        name="dan_tune",
+        name="lstm_tune",
         trial_dirname_creator=trial_name_string,
     )
 
@@ -115,7 +110,7 @@ def main(args):
 
     ray.init(log_to_driver=False)
 
-    tune_dan(args)
+    tune_lstm(args)
 
 
 def run():
