@@ -71,7 +71,7 @@ class LSTMClassifier(pl.LightningModule):
 
     @staticmethod
     def add_model_specific_args(parent_parser):
-        parser = parent_parser.add_argument_group("DAN")
+        parser = parent_parser.add_argument_group("LSTMClassifier")
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
         parser.add_argument("--hidden_dim", type=int, default=HIDDEN_DIM)
         parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
