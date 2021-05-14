@@ -138,6 +138,29 @@ class MIMICIIIDataModule(pl.LightningDataModule):
         return self.get_dataloader(self.test)
 
 
+class TransformerMIMICIIIDataModule(pl.LightningDataModule):
+    def __init__(self, path, tokenizer, batch_size, num_workers):
+        super().__init__()
+
+        self.path = path
+        self.tokenizer = tokenizer
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+
+    def setup(self):
+        columns = ["LABEL", "TEXT"]
+
+        self.labels = ["Not Readmitted", "Readmitted"]
+
+        train = pd.read_csv(self.path / "train.csv")
+        valid = pd.read_csv(self.path / "valid.csv")
+        test = pd.read_csv(self.path / "test.csv")
+
+        train_data = self.get_tuples(train[columns])
+        valid_data = self.get_tuples(valid[columns])
+        test_data = self.get_tuples(test[columns])
+
+
 class AGNNewsDataModule(pl.LightningDataModule):
     def __init__(self, batch_size, num_workers, pad_batch=False):
 
