@@ -1,10 +1,29 @@
-"""
-    Dummy conftest.py for clinical_longformer.
+import pytest
+import pandas as pd
 
-    If you don't know what this is for, just leave it empty.
-    Read more about conftest.py under:
-    - https://docs.pytest.org/en/stable/fixture.html
-    - https://docs.pytest.org/en/stable/writing_plugins.html
-"""
 
-# import pytest
+@pytest.fixture
+def admissions():
+    return pd.DataFrame(
+        [
+            [1, 0],
+            [2, 0],
+            [3, 1],
+        ],
+        columns=["HADM_ID", "LABEL"],
+    )
+
+
+@pytest.fixture
+def chunked():
+    return pd.DataFrame(
+        [
+            [1, "1", 0],
+            [2, "1 2", 0],
+            [2, "3", 0],
+            # Positives
+            [3, "1 2", 1],
+            [3, "3 4", 1],
+        ],
+        columns=["HADM_ID", "TEXT", "LABEL"],
+    )
