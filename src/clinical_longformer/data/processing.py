@@ -284,15 +284,14 @@ def get_unused_admissions(all_adm, used):
     return unused
 
 
-def get_remaining_chunks_to_balance(chunked, unused, note_length, diff, random_state):
+def get_remaining_chunks_to_balance(chunked, unused, diff, random_state):
     """Returns additional chunks of notes needed to balance positive and negative
     examples, considering to the `diff` parameter.
 
     Args:
         chunked (pandas.Dataframe): Chunked notes.
         unused (pandas.Series): Admissions to draw additional chunks from.
-        note_length (int): Size of the chunks.
-        diff (int): Difference between positive and negative examples.
+        diff (int): Difference in note length between positive and negative examples.
         random_state (int): Random state for sampling.
 
     Returns:
@@ -303,14 +302,12 @@ def get_remaining_chunks_to_balance(chunked, unused, note_length, diff, random_s
     total_lengths = unused_chunks.groupby("HADM_ID").agg(totallen=("LEN", "sum"))
     total_lengths = total_lengths.sample(frac=1, random_state=random_state)
     cumsum = total_lengths.cumsum()
-    not_readmit_ID_more = (
-        cumsum[cumsum.totallen <= diff * note_length].reset_index().HADM_ID
-    )
+    not_readmit_ID_more = cumsum[cumsum.totallen <= diff].reset_index().HADM_ID
     remaining = chunked[chunked.HADM_ID.isin(not_readmit_ID_more)]
     return remaining
 
 
-def split_discharge_summaries(admissions, chunked, note_length, random_state=1):
+def split_discharge_summaries(admissions, chunked, random_state=1):
     """Split chunked discharge summaries into training, validation and test sets.
 
     The training dataset will have balanced pos/neg examples.
@@ -318,7 +315,6 @@ def split_discharge_summaries(admissions, chunked, note_length, random_state=1):
     Args:
         admissions (pandas.Dataframe): Admissions dataframe
         chunked (pandas.Dataframe): Dataframe with chunked text
-        note_length (int): Size of the chunks
         random_state (int, optional): Random state for sampling. Defaults to 1.
 
     Returns:
@@ -340,8 +336,9 @@ def split_discharge_summaries(admissions, chunked, note_length, random_state=1):
 
     # Positive and negative examples might get unbalanced after chunking.
     # Positive usually have longer notes. Need to sample more negative examples.
-    positive = len(discharge_train[discharge_train.LABEL == 1])
-    negative = len(discharge_train[discharge_train.LABEL == 0])
+    discharge_train = set_token_length(discharge_train)
+    positive = discharge_train[discharge_train.LABEL == 1].LEN.sum()
+    negative = discharge_train[discharge_train.LABEL == 0].LEN.sum()
     diff = positive - negative
     assert diff > 0
 
@@ -349,10 +346,10 @@ def split_discharge_summaries(admissions, chunked, note_length, random_state=1):
     unused = get_unused_admissions(not_readmit_ID, not_readmit_ID_use)
 
     # Sample remaining negative examples. The sum of the lengths must not
-    # exceed diff * note_length. Wont get perfect balance between positive and
+    # exceed diff. Wont get perfect balance between positive and
     # negative because of varying length of notes.
     remaining = get_remaining_chunks_to_balance(
-        chunked, unused, note_length, diff, random_state
+        chunked, unused, diff, random_state
     )
     discharge_train = pd.concat([remaining, discharge_train])
 
@@ -472,7 +469,7 @@ def build_discharge_summary_dataset(mimic_path, note_length, out_path):
     if note_length != -1:
         df_discharge = df_discharge.pipe(chunk_text, note_length)
 
-    train, valid, test = split_discharge_summaries(df_adm, df_discharge, note_length)
+    train, valid, test = split_discharge_summaries(df_adm, df_discharge)
 
     path = Path(".") / out_path / "discharge" / str(note_length)
     path.mkdir(parents=True, exist_ok=True)
