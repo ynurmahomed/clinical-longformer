@@ -23,8 +23,8 @@ MAX_LENGTH = 512
 CLINICAL_BERT_PATH = ".data/model/pretraining"
 
 # Default hyperparameters
-LEARNING_RATE = 5e-5
-BATCH_SIZE = 8
+LEARNING_RATE = 2e-5
+BATCH_SIZE = 16
 
 
 class ClinicalBERT(pl.LightningModule):
