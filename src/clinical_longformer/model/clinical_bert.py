@@ -251,7 +251,7 @@ def main(args):
     )
 
     logger = TensorBoardLogger(
-        args.logdir, name="ClinicalBERT", default_hp_metric=False, log_graph=True
+        args.logdir, name="ClinicalBERT", default_hp_metric=False
     )
 
     trainer = pl.Trainer.from_argparse_args(args, logger=logger)
