@@ -14,6 +14,7 @@ ipython -m src.clinical_longformer.tune.clinical_bert -- \
     /mnt/lustre3p/users/ynurmahomed/datasets/discharge/512 \
     /mnt/lustre3p/users/ynurmahomed/.data/model/pretraining \
     --local_dir=/mnt/lustre3p/users/ynurmahomed/ray_results \
+    --checkpoint_callback=False
     --num_samples=10 \
     --max_epochs=3 \
     --num_workers=6 \
