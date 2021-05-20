@@ -9,36 +9,49 @@ import torchmetrics
 from argparse import ArgumentParser
 from pathlib import Path
 from pytorch_lightning.loggers import TensorBoardLogger
+from transformers import (
+    AdamW,
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+)
 
-from ..data.module import MIMICIIIDataModule, YelpReviewPolarityDataModule
+from ..data.module import TransformerMIMICIIIDataModule
 from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
 
+MAX_LENGTH = 512
+CLINICAL_BERT_PATH = ".data/model/pretraining"
+
 # Default hyperparameters
-LEARNING_RATE = 1e-2
-NUM_HIDDEN = 2
-W_DECAY = 1e-5
-WORD_DROPOUT = 0.7
-BATCH_SIZE = 50
-EMBED_DIM = 300
+LEARNING_RATE = 5e-5
+BATCH_SIZE = 8
 
 
 class ClinicalBERT(pl.LightningModule):
-    """Deep averaging network.
+    """ClinicalBERT: Modeling Clinical Notes and Predicting Hospital Readmission (Huang et al, 2020)
 
     Returns:
-        ClinicalBERT: Deep averaging network.
+        ClinicalBERT:
     """
 
     def __init__(
         self,
-        pre_trained_path,
+        clinical_bert_path,
+        labels,
         hparams,
     ):
 
         super().__init__()
 
+        self.labels = labels
+
+        self.lr = hparams["lr"]
+        self.hparams = hparams
+
         # Model
+        self.clinical_bert = AutoModelForSequenceClassification.from_pretrained(
+            clinical_bert_path, num_labels=len(labels)
+        )
 
         # Metrics
         pr_curve = torchmetrics.PrecisionRecallCurve()
@@ -53,52 +66,37 @@ class ClinicalBERT(pl.LightningModule):
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("ClinicalBERT")
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
-        parser.add_argument("--num_hidden", type=int, default=NUM_HIDDEN)
-        parser.add_argument("--weight_decay", type=float, default=W_DECAY)
-        parser.add_argument("--p", type=float, default=WORD_DROPOUT)
         parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
-        parser.add_argument(
-            "--embed_dim",
-            type=int,
-            default=EMBED_DIM,
-            choices=[50, 100, 200, 300],  # GloVe
-        )
         return parent_parser
 
     @staticmethod
     def get_model_hparams(namespace):
         hparams = vars(namespace)
-        return {
-            k: hparams[k]
-            for k in hparams.keys()
-            & {"lr", "num_hidden", "weight_decay", "p", "batch_size", "embed_dim"}
-        }
+        return {k: hparams[k] for k in hparams.keys() & {"lr", "clinical_bert_path"}}
 
-    def forward(self, x, offsets):
-
-        # Word dropout
-        p = torch.full_like(x, self.p, dtype=torch.float)
-        b = torch.bernoulli(p)
-        x[b == 0] = 0
-
-        embedded = self.embedding(x, offsets)
-
-        ff = self.feed_forward(embedded)
-
-        sigmoid = self.sigmoid(ff)
-
-        return sigmoid
+    def forward(self, labels, encodings):
+        input_ids = encodings["input_ids"]
+        attention_mask = encodings["attention_mask"]
+        token_type_ids = encodings["token_type_ids"]
+        return self.clinical_bert(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            labels=labels,
+        )
 
     def on_train_start(self):
         self.logger.log_hyperparams(self.hparams, {"AUC-PR/valid": 0})
 
     def training_step(self, batch, batch_idx):
 
-        y, x, offsets = batch
+        y, x = batch
 
-        preds = self(x, offsets).view(-1)
+        outputs = self(y, x)
 
-        loss = self.bce_loss(preds, y)
+        preds = torch.argmax(outputs.logits, -1)
+
+        loss = outputs.loss
 
         return {"loss": loss, "preds": preds, "target": y}
 
@@ -116,11 +114,13 @@ class ClinicalBERT(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        y, x, offsets = batch
+        y, x = batch
 
-        preds = self(x, offsets).view(-1)
+        outputs = self(y, x)
 
-        loss = self.bce_loss(preds, y)
+        preds = torch.argmax(outputs.logits, -1)
+
+        loss = outputs.loss
 
         return {"loss": loss, "preds": preds, "target": y}
 
@@ -138,9 +138,11 @@ class ClinicalBERT(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
 
-        y, x, offsets = batch
+        y, x = batch
 
-        preds = self(x, offsets).view(-1)
+        outputs = self(y, x)
+
+        preds = torch.argmax(outputs.logits, -1)
 
         return {"preds": preds, "target": y}
 
@@ -175,21 +177,22 @@ class ClinicalBERT(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        return torch.optim.Adagrad(
-            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
-        )
+        return AdamW(self.parameters(), lr=self.lr)
 
 
-def get_data_module(mimic_path, batch_size, num_workers):
+def get_data_module(mimic_path, clinical_bert_path, batch_size, num_workers):
     p = Path(mimic_path)
-    dm = MIMICIIIDataModule(p, batch_size, num_workers)
+    tokenizer = AutoTokenizer.from_pretrained(clinical_bert_path)
+    dm = TransformerMIMICIIIDataModule(
+        p, batch_size, tokenizer, MAX_LENGTH, num_workers
+    )
     dm.setup()
     return dm
 
 
 def set_example_input_array(datamodule, model):
-    _, x, offsets = next(iter(datamodule.train_dataloader()))
-    model.example_input_array = [x, offsets]
+    y, x = next(iter(datamodule.train_dataloader()))
+    model.example_input_array = [y, x]
 
 
 def add_arguments():
@@ -207,7 +210,7 @@ def add_arguments():
         dest="clinical_bert_path",
         help="Path containing ClinicalBERT pre-trained model",
         type=str,
-        default="./data",
+        default=CLINICAL_BERT_PATH,
     )
 
     parser.add_argument(
@@ -239,9 +242,13 @@ def main(args):
 
     args = parser.parse_args(args)
 
-    dm = get_data_module(args.mimic_path, args.batch_size, args.num_workers)
+    dm = get_data_module(
+        args.mimic_path, args.clinical_bert_path, args.batch_size, args.num_workers
+    )
 
-    model = ClinicalBERT(vectors, dm.vocab, dm.labels, ClinicalBERT.get_model_hparams(args))
+    model = ClinicalBERT(
+        args.clinical_bert_path, dm.labels, ClinicalBERT.get_model_hparams(args)
+    )
 
     logger = TensorBoardLogger(
         args.logdir, name="ClinicalBERT", default_hp_metric=False, log_graph=True

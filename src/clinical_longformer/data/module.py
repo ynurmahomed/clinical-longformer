@@ -7,7 +7,7 @@ import torch
 from collections import Counter
 from pathlib import Path
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import DataLoader, Sampler
+from torch.utils.data import DataLoader, Dataset
 from torchtext.experimental.datasets import AG_NEWS, YelpReviewPolarity
 from torchtext.experimental.datasets.text_classification import (
     build_vocab,
@@ -138,17 +138,30 @@ class MIMICIIIDataModule(pl.LightningDataModule):
         return self.get_dataloader(self.test)
 
 
+class LabelAndTextDataset(Dataset):
+    def __init__(self, text, labels):
+        self.text = text
+        self.labels = labels
+
+    def __getitem__(self, idx):
+        return self.labels[idx], self.text[idx]
+
+    def __len__(self):
+        return len(self.labels)
+
+
 class TransformerMIMICIIIDataModule(pl.LightningDataModule):
-    def __init__(self, path, tokenizer, batch_size, num_workers):
+    def __init__(self, path, batch_size, tokenizer, max_length, num_workers):
+
         super().__init__()
 
         self.path = path
-        self.tokenizer = tokenizer
         self.batch_size = batch_size
+        self.tokenizer = tokenizer
+        self.max_length = max_length
         self.num_workers = num_workers
 
     def setup(self):
-        columns = ["LABEL", "TEXT"]
 
         self.labels = ["Not Readmitted", "Readmitted"]
 
@@ -156,9 +169,54 @@ class TransformerMIMICIIIDataModule(pl.LightningDataModule):
         valid = pd.read_csv(self.path / "valid.csv")
         test = pd.read_csv(self.path / "test.csv")
 
-        train_data = self.get_tuples(train[columns])
-        valid_data = self.get_tuples(valid[columns])
-        test_data = self.get_tuples(test[columns])
+        train_texts, train_labels = train.TEXT.to_list(), train.LABEL.to_list()
+        valid_texts, valid_labels = valid.TEXT.to_list(), valid.LABEL.to_list()
+        test_texts, test_labels = test.TEXT.to_list(), test.LABEL.to_list()
+
+        self.train_dataset = LabelAndTextDataset(train_texts, train_labels)
+        self.valid_dataset = LabelAndTextDataset(valid_texts, valid_labels)
+        self.test_dataset = LabelAndTextDataset(test_texts, test_labels)
+
+    def collate_fn(self, batch):
+
+        label_list, text_list = [], []
+
+        for (_label, _text) in batch:
+            label_list.append(_label)
+            text_list.append(_text)
+
+        encoding = self.tokenizer(
+            text_list, padding=True, truncation=True, max_length=self.max_length
+        )
+
+        return torch.tensor(label_list), {
+            key: torch.tensor(val) for key, val in encoding.items()
+        }
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            collate_fn=self.collate_fn,
+            num_workers=self.num_workers,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.valid_dataset,
+            batch_size=self.batch_size,
+            collate_fn=self.collate_fn,
+            num_workers=self.num_workers,
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            collate_fn=self.collate_fn,
+            num_workers=self.num_workers,
+        )
 
 
 class AGNNewsDataModule(pl.LightningDataModule):
