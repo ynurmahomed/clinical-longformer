@@ -31,19 +31,19 @@ class LSTMClassifier(pl.LightningModule):
 
         self.labels = labels
 
-        hidden_dim = hparams["hidden_dim"]
-        dropout = hparams["dropout"]
-        self.lr = hparams["lr"]
-        self.hparams = hparams
+        self.save_hyperparameters(hparams, ignore=["vectors", "vocab", "labels"])
 
         if vectors is not None:
             pre_trained = vectors(vocab.itos)
             self.embedding = nn.Embedding.from_pretrained(pre_trained)
         else:
-            self.embedding = nn.Embedding(len(vocab), hparams["embed_dim"])
+            self.embedding = nn.Embedding(len(vocab), self.hparams.embed_dim)
 
         self.lstm = nn.LSTM(
-            hparams["embed_dim"], hidden_dim, bidirectional=True, dropout=dropout
+            hparams["embed_dim"],
+            self.hparams.hidden_dim,
+            bidirectional=True,
+            dropout=self.hparams.dropout,
         )
 
         # Global max pool
@@ -51,7 +51,7 @@ class LSTMClassifier(pl.LightningModule):
 
         self.linear = nn.Sequential(
             # Double input size for bi-LSTM
-            nn.Linear(2 * hidden_dim, 50),
+            nn.Linear(2 * self.hparams.hidden_dim, 50),
             nn.ReLU(),
             nn.Linear(50, 1),
         )
@@ -196,7 +196,7 @@ class LSTMClassifier(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
+        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
 
 
 def get_data_module(mimic_path, batch_size, num_workers):
@@ -251,9 +251,7 @@ def add_arguments():
 
     parser = LSTMClassifier.add_model_specific_args(parser)
 
-    parser = pl.Trainer.add_argparse_args(
-        parser.add_argument_group(title="pl.Trainer args")
-    )
+    parser = pl.Trainer.add_argparse_args(parser)
 
     return parser
 

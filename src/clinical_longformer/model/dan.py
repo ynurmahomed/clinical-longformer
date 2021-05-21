@@ -44,23 +44,19 @@ class DAN(pl.LightningModule):
 
         self.labels = labels
 
-        embed_dim = hparams["embed_dim"]
-        self.lr = hparams["lr"]
-        self.weight_decay = hparams["weight_decay"]
-        self.p = hparams["p"]
-        self.hparams = hparams
+        self.save_hyperparameters(hparams, ignore=["vectors", "vocab", "labels"])
 
         if vectors is not None:
             pre_trained = vectors(vocab.itos)
             self.embedding = nn.EmbeddingBag.from_pretrained(pre_trained)
         else:
-            self.embedding = nn.EmbeddingBag(len(vocab), embed_dim)
+            self.embedding = nn.EmbeddingBag(len(vocab), self.hparams.embed_dim)
 
         layers = []
         for _ in range(hparams["num_hidden"]):
-            layers.append(nn.Linear(embed_dim, embed_dim))
+            layers.append(nn.Linear(self.hparams.embed_dim, self.hparams.embed_dim))
             layers.append(nn.ReLU())
-        layers.append(nn.Linear(embed_dim, 1))
+        layers.append(nn.Linear(self.hparams.embed_dim, 1))
 
         self.feed_forward = nn.Sequential(*layers)
 
@@ -105,7 +101,7 @@ class DAN(pl.LightningModule):
     def forward(self, x, offsets):
 
         # Word dropout
-        p = torch.full_like(x, self.p, dtype=torch.float)
+        p = torch.full_like(x, self.hparams.p, dtype=torch.float)
         b = torch.bernoulli(p)
         x[b == 0] = 0
 
@@ -204,7 +200,9 @@ class DAN(pl.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adagrad(
-            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
+            self.parameters(),
+            lr=self.hparams.lr,
+            weight_decay=self.hparams.weight_decay,
         )
 
 
@@ -260,9 +258,7 @@ def add_arguments():
 
     parser = DAN.add_model_specific_args(parser)
 
-    parser = pl.Trainer.add_argparse_args(
-        parser.add_argument_group(title="pl.Trainer args")
-    )
+    parser = pl.Trainer.add_argparse_args(parser)
 
     return parser
 
