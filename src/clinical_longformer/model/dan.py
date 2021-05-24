@@ -128,15 +128,15 @@ class DAN(pl.LightningModule):
 
         return {"loss": loss, "preds": preds, "target": y}
 
-    def training_step_end(self, outputs):
+    def training_epoch_end(self, outputs):
 
-        loss = outputs["loss"]
+        target = torch.cat([o["target"] for o in outputs])
 
-        precision, recall, _ = self.train_pr_curve(outputs["preds"], outputs["target"])
+        preds = torch.cat([o["preds"] for o in outputs])
+
+        precision, recall, _ = self.train_pr_curve(preds, target)
 
         self.log("AUC-PR/train", auc_pr(precision, recall))
-
-        return loss
 
     def validation_step(self, batch, batch_idx):
 
@@ -150,15 +150,15 @@ class DAN(pl.LightningModule):
 
         return {"loss": loss, "preds": preds, "target": y}
 
-    def validation_step_end(self, outputs):
+    def validation_epoch_end(self, outputs):
 
-        loss = outputs["loss"]
+        target = torch.cat([o["target"] for o in outputs])
 
-        precision, recall, _ = self.valid_pr_curve(outputs["preds"], outputs["target"])
+        preds = torch.cat([o["preds"] for o in outputs])
+
+        precision, recall, _ = self.valid_pr_curve(preds, target)
 
         self.log("AUC-PR/valid", auc_pr(precision, recall))
-
-        return loss
 
     def test_step(self, batch, batch_idx):
 
