@@ -45,8 +45,7 @@ class ClinicalBERT(pl.LightningModule):
 
         self.labels = labels
 
-        self.lr = hparams["lr"]
-        self.hparams = hparams
+        self.save_hyperparameters(hparams, ignore=["clinical_bert_path", "labels"])
 
         # Model
         self.clinical_bert = AutoModelForSequenceClassification.from_pretrained(
@@ -98,19 +97,19 @@ class ClinicalBERT(pl.LightningModule):
 
         loss = outputs.loss
 
-        return {"loss": loss, "preds": preds, "target": y}
-
-    def training_step_end(self, outputs):
-
-        loss = outputs["loss"]
-
-        precision, recall, _ = self.train_pr_curve(outputs["preds"], outputs["target"])
-
-        self.log("AUC-PR/train", auc_pr(precision, recall))
-
         self.log("Loss/train", loss)
 
-        return loss
+        return {"loss": loss, "preds": preds, "target": y}
+
+    def training_epoch_end(self, outputs):
+
+        target = torch.cat([o["target"] for o in outputs])
+
+        preds = torch.cat([o["preds"] for o in outputs])
+
+        precision, recall, _ = self.train_pr_curve(preds, target)
+
+        self.log("AUC-PR/train", auc_pr(precision, recall))
 
     def validation_step(self, batch, batch_idx):
 
@@ -122,19 +121,19 @@ class ClinicalBERT(pl.LightningModule):
 
         loss = outputs.loss
 
-        return {"loss": loss, "preds": preds, "target": y}
-
-    def validation_step_end(self, outputs):
-
-        loss = outputs["loss"]
-
-        precision, recall, _ = self.valid_pr_curve(outputs["preds"], outputs["target"])
-
-        self.log("AUC-PR/valid", auc_pr(precision, recall))
-
         self.log("Loss/valid", loss)
 
-        return loss
+        return {"loss": loss, "preds": preds, "target": y}
+
+    def validation_epoch_end(self, outputs):
+
+        target = torch.cat([o["target"] for o in outputs])
+
+        preds = torch.cat([o["preds"] for o in outputs])
+
+        precision, recall, _ = self.valid_pr_curve(preds, target)
+
+        self.log("AUC-PR/valid", auc_pr(precision, recall))
 
     def test_step(self, batch, batch_idx):
 
@@ -177,7 +176,7 @@ class ClinicalBERT(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        return AdamW(self.parameters(), lr=self.lr)
+        return AdamW(self.parameters(), lr=self.hparams.lr)
 
 
 def get_data_module(mimic_path, clinical_bert_path, batch_size, num_workers):
@@ -229,9 +228,7 @@ def add_arguments():
 
     parser = ClinicalBERT.add_model_specific_args(parser)
 
-    parser = pl.Trainer.add_argparse_args(
-        parser.add_argument_group(title="pl.Trainer args")
-    )
+    parser = pl.Trainer.add_argparse_args(parser)
 
     return parser
 

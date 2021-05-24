@@ -18,5 +18,7 @@ ipython -m src.clinical_longformer.tune.clinical_bert -- \
     --checkpoint_callback=False \
     --num_samples=10 \
     --max_epochs=3 \
+    --log_every_n_steps=25
+    --val_check_interval=25
     --num_workers=6 \
     --gpus=1
