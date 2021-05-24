@@ -124,6 +124,8 @@ class DAN(pl.LightningModule):
 
         loss = self.bce_loss(preds, y)
 
+        self.log("Loss/train", loss)
+
         return {"loss": loss, "preds": preds, "target": y}
 
     def training_step_end(self, outputs):
@@ -133,8 +135,6 @@ class DAN(pl.LightningModule):
         precision, recall, _ = self.train_pr_curve(outputs["preds"], outputs["target"])
 
         self.log("AUC-PR/train", auc_pr(precision, recall))
-
-        self.log("Loss/train", loss)
 
         return loss
 
@@ -146,6 +146,8 @@ class DAN(pl.LightningModule):
 
         loss = self.bce_loss(preds, y)
 
+        self.log("Loss/valid", loss)
+
         return {"loss": loss, "preds": preds, "target": y}
 
     def validation_step_end(self, outputs):
@@ -155,8 +157,6 @@ class DAN(pl.LightningModule):
         precision, recall, _ = self.valid_pr_curve(outputs["preds"], outputs["target"])
 
         self.log("AUC-PR/valid", auc_pr(precision, recall))
-
-        self.log("Loss/valid", loss)
 
         return loss
 
