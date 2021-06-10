@@ -189,9 +189,9 @@ class TransformerMIMICIIIDataModule(pl.LightningDataModule):
             text_list, padding=True, truncation=True, max_length=self.max_length
         )
 
-        return torch.tensor(label_list), {
-            key: torch.tensor(val) for key, val in encoding.items()
-        }
+        encoding_dict = {key: torch.tensor(val) for key, val in encoding.items()}
+
+        return torch.tensor(label_list, dtype=torch.float), encoding_dict
 
     def train_dataloader(self):
         return DataLoader(

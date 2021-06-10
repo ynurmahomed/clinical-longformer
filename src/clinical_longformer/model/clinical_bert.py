@@ -2,7 +2,6 @@ import os
 import pytorch_lightning as pl
 import sys
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics
 
@@ -20,7 +19,7 @@ from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
 
 MAX_LENGTH = 512
-CLINICAL_BERT_PATH = ".data/model/pretraining"
+CLINICAL_BERT_PATH = "/home/yassin/Desktop/bert_uncased_L-12_H-768_A-12"
 
 # Default hyperparameters
 LEARNING_RATE = 2e-5
@@ -49,7 +48,7 @@ class ClinicalBERT(pl.LightningModule):
 
         # Model
         self.clinical_bert = AutoModelForSequenceClassification.from_pretrained(
-            clinical_bert_path, num_labels=len(labels)
+            clinical_bert_path, num_labels=1
         )
 
         # Metrics
@@ -64,6 +63,12 @@ class ClinicalBERT(pl.LightningModule):
     @staticmethod
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("ClinicalBERT")
+        parser.add_argument(
+            "--clinical_bert_path",
+            help="Path containing ClinicalBERT pre-trained model",
+            type=str,
+            default=CLINICAL_BERT_PATH,
+        )
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
         parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
         return parent_parser
@@ -71,17 +76,26 @@ class ClinicalBERT(pl.LightningModule):
     @staticmethod
     def get_model_hparams(namespace):
         hparams = vars(namespace)
-        return {k: hparams[k] for k in hparams.keys() & {"lr", "clinical_bert_path"}}
+        return {
+            k: hparams[k]
+            for k in hparams.keys() & {"lr", "clinical_bert_path", "batch_size"}
+        }
 
     def forward(self, labels, encodings):
+
         input_ids = encodings["input_ids"]
+
         attention_mask = encodings["attention_mask"]
+
         token_type_ids = encodings["token_type_ids"]
+
         return self.clinical_bert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            labels=labels,
+            # Unsqueeze labels so dimensions align when computing loss in
+            # (BertForSequenceClassification#forward).
+            labels=labels.unsqueeze(1),
         )
 
     def on_train_start(self):
@@ -203,13 +217,6 @@ def add_arguments():
         help="Path containing train/valid/test datasets",
         type=str,
         default=os.getcwd(),
-    )
-
-    parser.add_argument(
-        dest="clinical_bert_path",
-        help="Path containing ClinicalBERT pre-trained model",
-        type=str,
-        default=CLINICAL_BERT_PATH,
     )
 
     parser.add_argument(
