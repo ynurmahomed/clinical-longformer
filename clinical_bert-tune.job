@@ -3,7 +3,7 @@
 #PBS -q gpu_1
 #PBS -o /mnt/lustre3p/users/ynurmahomed/clinical_bert-tune/out
 #PBS -e /mnt/lustre3p/users/ynurmahomed/clinical_bert-tune/err
-#PBS -l walltime=04:00:00
+#PBS -l walltime=02:00:00
 #PBS -WMail_Users=nrmyas001@myuct.ac.za
 
 module load chpc/python/3.7.0
@@ -16,7 +16,7 @@ ipython -m src.clinical_longformer.tune.clinical_bert -- \
     /mnt/lustre3p/users/ynurmahomed/.data/pretraining_output_512 \
     --local_dir=/mnt/lustre3p/users/ynurmahomed/ray_results \
     --checkpoint_callback=False \
-    --num_samples=20 \
+    --num_samples=10 \
     --max_steps=300 \
     --log_every_n_steps=15 \
     --val_check_interval=15 \
