@@ -21,7 +21,7 @@ from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
 
 MAX_LENGTH = 512
-CLINICAL_BERT_PATH = "/home/yassin/Desktop/bert_uncased_L-12_H-768_A-12"
+CLINICAL_BERT_PATH = ".data/model/pretraining"
 
 # Default hyperparameters
 LEARNING_RATE = 2e-5
