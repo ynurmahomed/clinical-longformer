@@ -2,6 +2,7 @@ import os
 import pytorch_lightning as pl
 import sys
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics
 
@@ -15,6 +16,7 @@ from transformers import (
 )
 
 from ..data.module import TransformerMIMICIIIDataModule
+from .metrics import ClinicalBERTBinnedPRCurve
 from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
 
@@ -51,8 +53,12 @@ class ClinicalBERT(pl.LightningModule):
             clinical_bert_path, num_labels=1
         )
 
+        self.sigmoid = nn.Sigmoid()
+
+        self.bce_loss = F.binary_cross_entropy
+
         # Metrics
-        pr_curve = torchmetrics.PrecisionRecallCurve()
+        pr_curve = ClinicalBERTBinnedPRCurve()
 
         self.train_pr_curve = pr_curve.clone()
         self.valid_pr_curve = pr_curve.clone()
@@ -89,89 +95,93 @@ class ClinicalBERT(pl.LightningModule):
 
         token_type_ids = encodings["token_type_ids"]
 
-        return self.clinical_bert(
+        output = self.clinical_bert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             # Unsqueeze labels so dimensions align when computing loss in
             # (BertForSequenceClassification#forward).
-            labels=labels.unsqueeze(1),
+            labels=labels,
         )
+
+        sigmoid = self.sigmoid(output.logits)
+
+        return sigmoid
 
     def on_train_start(self):
         self.logger.log_hyperparams(self.hparams, {"AUC-PR/valid": 0})
 
     def training_step(self, batch, batch_idx):
 
-        y, x = batch
+        hadm_id, y, x = batch
 
-        outputs = self(y, x)
+        preds = self(y, x).squeeze()
 
-        preds = torch.argmax(outputs.logits, -1)
-
-        loss = outputs.loss
+        loss = self.bce_loss(preds, y)
 
         self.log("Loss/train", loss)
 
-        return {"loss": loss, "preds": preds, "target": y}
+        return {"loss": loss, "hadm_id": hadm_id, "preds": preds, "target": y}
 
     def training_epoch_end(self, outputs):
+
+        hadm_ids = torch.cat([o["hadm_id"] for o in outputs])
 
         target = torch.cat([o["target"] for o in outputs])
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        precision, recall, _ = self.train_pr_curve(preds, target)
+        precision, recall, _ = self.train_pr_curve(hadm_ids, preds, target)
 
         self.log("AUC-PR/train", auc_pr(precision, recall))
 
     def validation_step(self, batch, batch_idx):
 
-        y, x = batch
+        hadm_id, y, x = batch
 
-        outputs = self(y, x)
+        preds = self(y, x).squeeze()
 
-        preds = torch.argmax(outputs.logits, -1)
-
-        loss = outputs.loss
+        loss = self.bce_loss(preds, y)
 
         self.log("Loss/valid", loss)
 
-        return {"loss": loss, "preds": preds, "target": y}
+        return {"loss": loss, "hadm_id": hadm_id, "preds": preds, "target": y}
 
     def validation_epoch_end(self, outputs):
+
+        hadm_ids = torch.cat([o["hadm_id"] for o in outputs])
 
         target = torch.cat([o["target"] for o in outputs])
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        precision, recall, _ = self.valid_pr_curve(preds, target)
+        precision, recall, _ = self.valid_pr_curve(hadm_ids, preds, target)
 
         self.log("AUC-PR/valid", auc_pr(precision, recall))
 
     def test_step(self, batch, batch_idx):
 
-        y, x = batch
+        hadm_id, y, x = batch
 
-        outputs = self(y, x)
+        preds = self(y, x).squeeze()
 
-        preds = torch.argmax(outputs.logits, -1)
-
-        return {"preds": preds, "target": y}
+        return {"hadm_id": hadm_id, "preds": preds, "target": y}
 
     def test_epoch_end(self, outputs):
+
+        hadm_ids = torch.cat([o["hadm_id"] for o in outputs])
 
         y = torch.cat([o["target"] for o in outputs])
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        self.log_pr_curve(preds, y)
+        self.log_pr_curve(hadm_ids, preds, y)
 
         self.log_confusion_matrix(preds, y)
 
-    def log_pr_curve(self, preds, y):
+    def log_pr_curve(self, hadm_ids, logits, y):
 
-        precision, recall, _ = self.test_pr_curve(preds, y)
+        precision, recall, _ = self.test_pr_curve(hadm_ids, logits, y)
 
         fig = plot_pr_curve(precision, recall)
 
@@ -204,7 +214,7 @@ def get_data_module(mimic_path, clinical_bert_path, batch_size, num_workers):
 
 
 def set_example_input_array(datamodule, model):
-    y, x = next(iter(datamodule.train_dataloader()))
+    _, y, x = next(iter(datamodule.train_dataloader()))
     model.example_input_array = [y, x]
 
 

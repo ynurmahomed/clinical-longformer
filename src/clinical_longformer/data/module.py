@@ -138,13 +138,14 @@ class MIMICIIIDataModule(pl.LightningDataModule):
         return self.get_dataloader(self.test)
 
 
-class LabelAndTextDataset(Dataset):
-    def __init__(self, text, labels):
+class NoteEventsDataset(Dataset):
+    def __init__(self, hadm_ids, text, labels):
+        self.hadm_ids = hadm_ids
         self.text = text
         self.labels = labels
 
     def __getitem__(self, idx):
-        return self.labels[idx], self.text[idx]
+        return self.hadm_ids[idx], self.labels[idx], self.text[idx]
 
     def __len__(self):
         return len(self.labels)
@@ -169,19 +170,36 @@ class TransformerMIMICIIIDataModule(pl.LightningDataModule):
         valid = pd.read_csv(self.path / "valid.csv")
         test = pd.read_csv(self.path / "test.csv")
 
-        train_texts, train_labels = train.TEXT.to_list(), train.LABEL.to_list()
-        valid_texts, valid_labels = valid.TEXT.to_list(), valid.LABEL.to_list()
-        test_texts, test_labels = test.TEXT.to_list(), test.LABEL.to_list()
+        train_hadm_ids, train_texts, train_labels = (
+            train.HADM_ID.to_list(),
+            train.TEXT.to_list(),
+            train.LABEL.to_list(),
+        )
+        valid_hadm_ids, valid_texts, valid_labels = (
+            valid.HADM_ID.to_list(),
+            valid.TEXT.to_list(),
+            valid.LABEL.to_list(),
+        )
+        test_hadm_ids, test_texts, test_labels = (
+            test.HADM_ID.to_list(),
+            test.TEXT.to_list(),
+            test.LABEL.to_list(),
+        )
 
-        self.train_dataset = LabelAndTextDataset(train_texts, train_labels)
-        self.valid_dataset = LabelAndTextDataset(valid_texts, valid_labels)
-        self.test_dataset = LabelAndTextDataset(test_texts, test_labels)
+        self.train_dataset = NoteEventsDataset(
+            train_hadm_ids, train_texts, train_labels
+        )
+        self.valid_dataset = NoteEventsDataset(
+            valid_hadm_ids, valid_texts, valid_labels
+        )
+        self.test_dataset = NoteEventsDataset(test_hadm_ids, test_texts, test_labels)
 
     def collate_fn(self, batch):
 
-        label_list, text_list = [], []
+        hadm_id_list, label_list, text_list = [], [], []
 
-        for (_label, _text) in batch:
+        for (_hadm_id, _label, _text) in batch:
+            hadm_id_list.append(_hadm_id)
             label_list.append(_label)
             text_list.append(_text)
 
@@ -191,7 +209,11 @@ class TransformerMIMICIIIDataModule(pl.LightningDataModule):
 
         encoding_dict = {key: torch.tensor(val) for key, val in encoding.items()}
 
-        return torch.tensor(label_list, dtype=torch.float), encoding_dict
+        return (
+            torch.tensor(hadm_id_list, dtype=torch.float),
+            torch.tensor(label_list, dtype=torch.float),
+            encoding_dict,
+        )
 
     def train_dataloader(self):
         return DataLoader(
