@@ -13,7 +13,7 @@ source .venv/bin/activate
 TOKENIZERS_PARALLELISM=False \
 ipython -m src.clinical_longformer.tune.clinical_bert -- \
     /mnt/lustre3p/users/ynurmahomed/datasets/discharge/512 \
-    /mnt/lustre3p/users/ynurmahomed/.data/pretraining_output_512 \
+    --clinical_bert_path=/mnt/lustre3p/users/ynurmahomed/.data/pretraining_output_512 \
     --local_dir=/mnt/lustre3p/users/ynurmahomed/ray_results \
     --checkpoint_callback=False \
     --num_samples=10 \
