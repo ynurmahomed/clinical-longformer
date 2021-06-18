@@ -101,7 +101,7 @@ class ClinicalBERT(pl.LightningModule):
             token_type_ids=token_type_ids,
             # Unsqueeze labels so dimensions align when computing loss in
             # (BertForSequenceClassification#forward).
-            labels=labels,
+            labels=labels.unsqueeze(1),
         )
 
         sigmoid = self.sigmoid(output.logits)

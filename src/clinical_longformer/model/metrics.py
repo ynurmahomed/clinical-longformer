@@ -29,9 +29,9 @@ class ClinicalBERTBinnedPRCurve(Metric):
 
         df = pd.DataFrame(
             {
-                "hadm_id": self.hadm_id,
-                "preds": self.preds,
-                "target": self.target,
+                "hadm_id": self.hadm_id.cpu().numpy(),
+                "preds": self.preds.cpu().numpy(),
+                "target": self.target.cpu().numpy(),
             }
         )
 
