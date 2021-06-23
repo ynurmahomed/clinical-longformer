@@ -13,15 +13,15 @@ from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler, PopulationBasedTraining
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
-from ..model.clinical_bert import ClinicalBERT, get_data_module, add_arguments
+from ..model.clinical_bert import BertPretrainedModule, get_data_module, add_arguments
 from .utils import trial_name_string
 
 
-def train_tune(config, mimic_path, clinical_bert_path, num_workers, max_epochs, gpus, logdir):
+def train_tune(config, mimic_path, bert_pretrained_path, num_workers, max_epochs, gpus, logdir):
 
-    dm = get_data_module(mimic_path, clinical_bert_path, config["batch_size"], num_workers)
+    dm = get_data_module(mimic_path, bert_pretrained_path, config["batch_size"], num_workers)
 
-    model = ClinicalBERT(clinical_bert_path, dm.labels, config)
+    model = BertPretrainedModule(bert_pretrained_path, dm.labels, config)
 
     logger = TensorBoardLogger(
         tune.get_trial_dir(), name="", version=".", default_hp_metric=False
@@ -61,7 +61,7 @@ def tune_clinical_bert(args):
     trainable = tune.with_parameters(
         train_tune,
         mimic_path=args.mimic_path,
-        clinical_bert_path=args.clinical_bert_path,
+        bert_pretrained_path=args.bert_pretrained_path,
         num_workers=args.num_workers,
         max_epochs=args.max_epochs,
         gpus=args.gpus,

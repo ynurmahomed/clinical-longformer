@@ -21,23 +21,23 @@ from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
 
 MAX_LENGTH = 512
-CLINICAL_BERT_PATH = ".data/model/pretraining"
+BERT_PRETRAINED_PATH = ".data/model/pretraining"
 
 # Default hyperparameters
 LEARNING_RATE = 2e-5
 BATCH_SIZE = 16
 
 
-class ClinicalBERT(pl.LightningModule):
-    """ClinicalBERT: Modeling Clinical Notes and Predicting Hospital Readmission (Huang et al, 2020)
+class BertPretrainedModule(pl.LightningModule):
+    """Lightning module for any bert pre-trained model from the transformers library.
 
     Returns:
-        ClinicalBERT:
+        BertPretrainedModule:
     """
 
     def __init__(
         self,
-        clinical_bert_path,
+        bert_pretrained_path,
         labels,
         hparams,
     ):
@@ -46,11 +46,11 @@ class ClinicalBERT(pl.LightningModule):
 
         self.labels = labels
 
-        self.save_hyperparameters(hparams, ignore=["clinical_bert_path", "labels"])
+        self.save_hyperparameters(hparams, ignore=["bert_pretrained_path", "labels"])
 
         # Model
-        self.clinical_bert = AutoModelForSequenceClassification.from_pretrained(
-            clinical_bert_path, num_labels=1
+        self.bert_pretrained_model = AutoModelForSequenceClassification.from_pretrained(
+            bert_pretrained_path, num_labels=1
         )
 
         self.sigmoid = nn.Sigmoid()
@@ -70,10 +70,10 @@ class ClinicalBERT(pl.LightningModule):
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("ClinicalBERT")
         parser.add_argument(
-            "--clinical_bert_path",
+            "--bert_pretrained_path",
             help="Path containing ClinicalBERT pre-trained model",
             type=str,
-            default=CLINICAL_BERT_PATH,
+            default=BERT_PRETRAINED_PATH,
         )
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
         parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
@@ -84,7 +84,7 @@ class ClinicalBERT(pl.LightningModule):
         hparams = vars(namespace)
         return {
             k: hparams[k]
-            for k in hparams.keys() & {"lr", "clinical_bert_path", "batch_size"}
+            for k in hparams.keys() & {"lr", "bert_pretrained_path", "batch_size"}
         }
 
     def forward(self, labels, encodings):
@@ -95,7 +95,7 @@ class ClinicalBERT(pl.LightningModule):
 
         token_type_ids = encodings["token_type_ids"]
 
-        output = self.clinical_bert(
+        output = self.bert_pretrained_model(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -203,9 +203,9 @@ class ClinicalBERT(pl.LightningModule):
         return AdamW(self.parameters(), lr=self.hparams.lr)
 
 
-def get_data_module(mimic_path, clinical_bert_path, batch_size, num_workers):
+def get_data_module(mimic_path, bert_pretrained_path, batch_size, num_workers):
     p = Path(mimic_path)
-    tokenizer = AutoTokenizer.from_pretrained(clinical_bert_path)
+    tokenizer = AutoTokenizer.from_pretrained(bert_pretrained_path)
     dm = TransformerMIMICIIIDataModule(
         p, batch_size, tokenizer, MAX_LENGTH, num_workers
     )
@@ -243,7 +243,7 @@ def add_arguments():
         default="lightning_logs",
     )
 
-    parser = ClinicalBERT.add_model_specific_args(parser)
+    parser = BertPretrainedModule.add_model_specific_args(parser)
 
     parser = pl.Trainer.add_argparse_args(parser)
 
@@ -257,11 +257,11 @@ def main(args):
     args = parser.parse_args(args)
 
     dm = get_data_module(
-        args.mimic_path, args.clinical_bert_path, args.batch_size, args.num_workers
+        args.mimic_path, args.bert_pretrained_path, args.batch_size, args.num_workers
     )
 
-    model = ClinicalBERT(
-        args.clinical_bert_path, dm.labels, ClinicalBERT.get_model_hparams(args)
+    model = BertPretrainedModule(
+        args.bert_pretrained_path, dm.labels, BertPretrainedModule.get_model_hparams(args)
     )
 
     logger = TensorBoardLogger(
