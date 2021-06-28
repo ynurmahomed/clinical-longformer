@@ -48,9 +48,16 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.save_hyperparameters(hparams, ignore=["bert_pretrained_path", "labels"])
 
-        # Model
+        # BERT type Model
         self.bert_pretrained_model = AutoModelForSequenceClassification.from_pretrained(
             bert_pretrained_path, num_labels=1
+        )
+
+        # 3 layer classifier like in Huang, K., Altosaar, J., & Ranganath, R. (2019).
+        self.bert_pretrained_model.classifier = nn.Sequential(
+            nn.Linear(self.bert_pretrained_model.config.hidden_size, 2048),
+            nn.Linear(2048, 768),
+            nn.Linear(768, self.bert_pretrained_model.config.num_labels)
         )
 
         self.sigmoid = nn.Sigmoid()
