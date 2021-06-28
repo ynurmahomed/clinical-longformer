@@ -1,8 +1,8 @@
 #PBS -l select=1:ncpus=10:ngpus=1
 #PBS -P CSCI1335
 #PBS -q gpu_1
-#PBS -o /mnt/lustre3p/users/ynurmahomed/lstm-tune/out
-#PBS -e /mnt/lustre3p/users/ynurmahomed/lstm-tune/err
+#PBS -o /mnt/lustre3p/users/ynurmahomed/logs/lstm-tune/
+#PBS -e /mnt/lustre3p/users/ynurmahomed/logs/lstm-tune/
 #PBS -l walltime=07:00:00
 #PBS -WMail_Users=nrmyas001@myuct.ac.za
 
