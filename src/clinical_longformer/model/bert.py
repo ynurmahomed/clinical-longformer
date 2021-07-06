@@ -1,3 +1,4 @@
+import logging
 import os
 import pytorch_lightning as pl
 import sys
@@ -9,16 +10,20 @@ import torchmetrics
 from argparse import ArgumentParser
 from pathlib import Path
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import LearningRateMonitor
 from transformers import (
     AdamW,
     AutoTokenizer,
     AutoModelForSequenceClassification,
+    SchedulerType,
+    get_scheduler,
 )
 
 from ..data.module import TransformerMIMICIIIDataModule
 from .metrics import ClinicalBERTBinnedPRCurve
 from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
+_logger = logging.getLogger(__name__)
 
 MAX_LENGTH = 512
 BERT_PRETRAINED_PATH = ".data/model/pretraining"
@@ -84,6 +89,22 @@ class BertPretrainedModule(pl.LightningModule):
         )
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
         parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
+        parser.add_argument(
+            "--lr_scheduler_type",
+            type=SchedulerType,
+            default="linear",
+            help="The scheduler type to use.",
+            # choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"],
+        )
+
+        parser.add_argument(
+            "--warmup_proportion",
+            default=0.1,
+            type=float,
+            help="Proportion of training to perform linear learning rate warmup for. "
+                    "E.g., 0.1 = 10%% of training."
+        )
+
         return parent_parser
 
     @staticmethod
@@ -91,7 +112,7 @@ class BertPretrainedModule(pl.LightningModule):
         hparams = vars(namespace)
         return {
             k: hparams[k]
-            for k in hparams.keys() & {"lr", "bert_pretrained_path", "batch_size"}
+            for k in hparams.keys() & {"lr", "bert_pretrained_path", "batch_size", "lr_scheduler_type", "warmup_proportion"}
         }
 
     def forward(self, labels, encodings):
@@ -207,7 +228,15 @@ class BertPretrainedModule(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        return AdamW(self.parameters(), lr=self.hparams.lr)
+        optimizer = AdamW(self.parameters(), lr=self.hparams.lr)
+        lr_scheduler = get_scheduler(
+            name=self.hparams.lr_scheduler_type,
+            optimizer=optimizer,
+            num_warmup_steps=self.num_warmup_steps,
+            num_training_steps=self.num_training_steps,
+        )
+
+        return [optimizer], [{"scheduler": lr_scheduler, "interval": "step"}]
 
 
 def get_data_module(mimic_path, bert_pretrained_path, batch_size, num_workers):
@@ -271,11 +300,24 @@ def main(args):
         args.bert_pretrained_path, dm.labels, BertPretrainedModule.get_model_hparams(args)
     )
 
+    # Setup lr scheduler
+    n_batches = len(dm.train_dataloader())
+    n_devices = args.gpus # or args.tpu_cores if tpu or 1 if cpu
+    num_training_steps = n_batches // args.accumulate_grad_batches * args.max_epochs // n_devices
+    model.num_training_steps = num_training_steps
+    model.num_warmup_steps = int(args.warmup_proportion*num_training_steps)
+
+    lr_monitor = LearningRateMonitor(logging_interval='step')
+
+    print(
+        f"n_batches={n_batches}\n batch_size * gpus={args.batch_size * max(1, (args.gpus or 0))}\n max_epochs={args.max_epochs}\n num_training_steps={num_training_steps}\n num_warmup_steps={model.num_warmup_steps}"
+    )
+
     logger = TensorBoardLogger(
         args.logdir, name="ClinicalBERT", default_hp_metric=False
     )
 
-    trainer = pl.Trainer.from_argparse_args(args, logger=logger)
+    trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=[lr_monitor])
 
     set_example_input_array(dm, model)
 
