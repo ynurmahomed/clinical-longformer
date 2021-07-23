@@ -5,6 +5,7 @@ import torch
 
 from torchmetrics.functional import auc
 from matplotlib.axes import Axes
+from sklearn.metrics import PrecisionRecallDisplay
 
 
 def macro_auc_pr(precision: torch.Tensor, recall: torch.Tensor) -> torch.Tensor:
@@ -17,21 +18,18 @@ def auc_pr(precision: torch.Tensor, recall: torch.Tensor) -> torch.Tensor:
 
 def plot_pr_curve(precision, recall):
 
-    sns.set_theme()
-
-    d = {"Precision": precision.cpu(), "Recall": recall.cpu()}
-    df = pd.DataFrame(d)
-
     plt.figure(figsize=(10, 7))
 
-    ax = sns.lineplot(data=df, x="Recall", y="Precision")
+    disp = PrecisionRecallDisplay(precision=precision, recall=recall)
 
-    ax.legend([f"AUC {auc(recall, precision):.2f}"])
+    disp.plot()
 
-    ax.set_xlim(-0.05, 1.05)
-    ax.set_ylim(-0.05, 1.05)
+    disp.ax_.legend([f"AUC {auc(recall, precision):.2f}"])
 
-    fig = ax.get_figure()
+    plt.xlim(-0.05, 1.05)
+    plt.ylim(-0.05, 1.05)
+
+    fig = disp.figure_
     plt.close(fig)
 
     return fig
