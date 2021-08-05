@@ -137,3 +137,4 @@ webencodings==0.5.1
 Werkzeug==1.0.1
 xxhash==2.0.2
 yarl==1.6.3
+scikit-learn==0.24.2
