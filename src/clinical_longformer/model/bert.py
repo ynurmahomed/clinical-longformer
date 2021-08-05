@@ -92,7 +92,7 @@ class BertPretrainedModule(pl.LightningModule):
         parser.add_argument(
             "--lr_scheduler_type",
             type=SchedulerType,
-            default="linear",
+            default=None,
             help="The scheduler type to use.",
             # choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"],
         )
@@ -229,14 +229,17 @@ class BertPretrainedModule(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.hparams.lr)
-        lr_scheduler = get_scheduler(
-            name=self.hparams.lr_scheduler_type,
-            optimizer=optimizer,
-            num_warmup_steps=self.num_warmup_steps,
-            num_training_steps=self.num_training_steps,
-        )
 
-        return [optimizer], [{"scheduler": lr_scheduler, "interval": "step"}]
+        if self.hparams.lr_scheduler_type is not None:
+            lr_scheduler = get_scheduler(
+                name=self.hparams.lr_scheduler_type,
+                optimizer=optimizer,
+                num_warmup_steps=self.num_warmup_steps,
+                num_training_steps=self.num_training_steps,
+            )
+            return [optimizer], [{"scheduler": lr_scheduler, "interval": "step"}]
+
+        return optimizer
 
 
 def get_data_module(mimic_path, bert_pretrained_path, batch_size, num_workers):
