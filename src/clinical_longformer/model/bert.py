@@ -302,7 +302,7 @@ def main(args):
 
     # Setup lr scheduler
     n_batches = len(dm.train_dataloader())
-    n_devices = args.gpus # or args.tpu_cores if tpu or 1 if cpu
+    n_devices = args.gpus if args.gpus else 1  # cpu or tpu_cores
     num_training_steps = n_batches // args.accumulate_grad_batches * args.max_epochs // n_devices
     model.num_training_steps = num_training_steps
     model.num_warmup_steps = int(args.warmup_proportion*num_training_steps)
