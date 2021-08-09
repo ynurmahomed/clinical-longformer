@@ -3,7 +3,7 @@
 #PBS -q gpu_1
 #PBS -o /mnt/lustre/users/ynurmahomed/logs/clinical_longf-train/
 #PBS -e /mnt/lustre/users/ynurmahomed/logs/clinical_longf-train/
-#PBS -l walltime=01:00:00
+#PBS -l walltime=00:15:00
 #PBS -WMail_Users=nrmyas001@myuct.ac.za
 
 module load chpc/python/3.7.0
