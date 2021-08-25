@@ -6,15 +6,15 @@
 #PBS -l walltime=00:15:00
 #PBS -WMail_Users=nrmyas001@myuct.ac.za
 
-module load chpc/python/3.7.0
-cd /mnt/lustre/users/ynurmahomed/clinical-longformer
+module load python/anaconda-python-3.7
+cd /home/nrmyas001/clinical-longformer
 source .venv/bin/activate
 
 export TOKENIZERS_PARALLELISM=False
 
 ipython -m src.clinical_longformer.model.bert -- \
-    /mnt/lustre/users/ynurmahomed/datasets/discharge/2048 \
-    --bert_pretrained_path=/mnt/lustre/users/ynurmahomed/.data/pretraining_output/bert_uncased_L-12_H-768_A-12-2048/2048/checkpoint-100000 \
+    /scrath/nrmyas001/datasets/discharge/2048 \
+    --bert_pretrained_path=/scratch/nrmyas001/.data/pretraining_output/bert_uncased_L-12_H-768_A-12-2048/2048/checkpoint-100000 \
     --logdir=/mnt/lustre/users/ynurmahomed/lightning_logs \
     --batch_size=16 \
     --lr=3e-5 \

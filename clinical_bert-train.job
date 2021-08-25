@@ -1,23 +1,27 @@
-#PBS -l select=1:ncpus=10:ngpus=1
-#PBS -P CSCI1335
-#PBS -q gpu_1
-#PBS -o /mnt/lustre/users/ynurmahomed/logs/clinical_bert-train-bert/
-#PBS -e /mnt/lustre/users/ynurmahomed/logs/clinical_bert-train-bert/
-#PBS -l walltime=00:30:00
-#PBS -WMail_Users=nrmyas001@myuct.ac.za
+#!/bin/sh
+#SBATCH --account=compsci --partition=a100
+#SBATCH --nodes=1
+#SBATCH --ntasks=6
+#SBATCH --gres=gpu:a100-4g-20gb:1
+#SBATCH --job-name="clinical_bert-train"
+#SBATCH --mail-user=nrmyas001@cs.uct.ac.za
+#SBATCH --mail-type=ALL
+#SBATCH --time=00:30:00
 
-module load chpc/python/3.7.0
-cd /mnt/lustre/users/ynurmahomed/clinical-longformer
+module load python/anaconda-python-3.7
+cd /home/nrmyas001/clinical-longformer
 source .venv/bin/activate
 
+export CUDA_VISIBLE_DEVICES=$(ncvd)
 export TOKENIZERS_PARALLELISM=false
 
-ipython -m src.clinical_longformer.model.bert -- \
-    /mnt/lustre/users/ynurmahomed/datasets/discharge/2048 \
-    --bert_pretrained_path=/mnt/lustre/users/ynurmahomed/.data/pretraining_output/bert_uncased_L-12_H-768_A-12-2048/2048/ \
-    --logdir=/mnt/lustre/users/ynurmahomed/lightning_logs \
+python -m src.clinical_longformer.model.bert  \
+    /scratch/nrmyas001/datasets/discharge/512 \
+    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12/512/ \
+    --logdir=/scratch/nrmyas001/lightning_logs \
     --batch_size=16 \
     --lr=3e-5 \
     --max_epochs=3 \
     --num_workers=6 \
-    --gpus=1
+    --gpus=1 > /scratch/nrmyas001/logs/clinical_bert-train/$(hostname)$(openssl rand -hex 4).out
+
