@@ -66,8 +66,6 @@ class MIMICIIIDataModule(pl.LightningDataModule):
 
         self.label_transform = totensor(torch.float)
 
-        transforms = (self.label_transform, self.text_transform)
-
         self.train = TextClassificationDataset(self.vocab, train_data, self.labels)
 
         self.valid = TextClassificationDataset(self.vocab, valid_data, self.labels)
