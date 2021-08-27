@@ -8,7 +8,7 @@ import torchmetrics
 
 from argparse import ArgumentParser
 from pathlib import Path
-from torchtext.experimental.vectors import GloVe
+from torchtext.vocab import GloVe
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from ..data.module import MIMICIIIDataModule
@@ -34,7 +34,7 @@ class LSTMClassifier(pl.LightningModule):
         self.save_hyperparameters(hparams, ignore=["vectors", "vocab", "labels"])
 
         if vectors is not None:
-            pre_trained = vectors(vocab.itos)
+            pre_trained = vectors.get_vecs_by_tokens(list(vocab.get_stoi()))
             self.embedding = nn.Embedding.from_pretrained(pre_trained)
         else:
             self.embedding = nn.Embedding(len(vocab), self.hparams.embed_dim)
@@ -206,8 +206,8 @@ def get_data_module(mimic_path, batch_size, num_workers):
     return dm
 
 
-def get_vectors(dim, root):
-    return GloVe(name="6B", dim=dim, root=root)
+def get_vectors(dim, cache):
+    return GloVe(name="6B", dim=dim, cache=cache)
 
 
 def set_example_input_array(datamodule, model):

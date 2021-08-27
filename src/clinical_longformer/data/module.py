@@ -8,19 +8,15 @@ from collections import Counter
 from pathlib import Path
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
-from torchtext.experimental.datasets import AG_NEWS, YelpReviewPolarity
-from torchtext.experimental.datasets.text_classification import (
+from torchtext.datasets import AG_NEWS, YelpReviewPolarity
+from torchtext.legacy.datasets.text_classification import TextClassificationDataset
+from torchtext.data.utils import get_tokenizer
+from .torchtext_experimental import (
     build_vocab,
-    TextClassificationDataset,
-)
-from torchtext.experimental.functional import (
     sequential_transforms,
-    vocab_func,
     totensor,
+    vocab_func,
 )
-from torchtext.experimental.transforms import basic_english_normalize
-from torchtext.vocab import Vocab
-
 from .utils import BatchRandomPooledSampler
 
 
@@ -60,23 +56,23 @@ class MIMICIIIDataModule(pl.LightningDataModule):
         valid_data = self.get_tuples(valid[columns])
         test_data = self.get_tuples(test[columns])
 
-        tokenizer = basic_english_normalize()
-        data = self.get_tuples(train[columns])
+        tokenizer = get_tokenizer("basic_english")
+        data = self.get_tuples(pd.concat([train, valid, test])[columns])
         self.vocab = build_vocab(data, tokenizer)
 
-        token_transform = sequential_transforms(
+        self.text_transform = sequential_transforms(
             tokenizer, vocab_func(self.vocab), totensor(torch.long)
         )
 
-        label_transform = totensor(torch.float)
+        self.label_transform = totensor(torch.float)
 
-        transforms = (label_transform, token_transform)
+        transforms = (self.label_transform, self.text_transform)
 
-        self.train = TextClassificationDataset(train_data, self.vocab, transforms)
+        self.train = TextClassificationDataset(self.vocab, train_data, self.labels)
 
-        self.valid = TextClassificationDataset(valid_data, self.vocab, transforms)
+        self.valid = TextClassificationDataset(self.vocab, valid_data, self.labels)
 
-        self.test = TextClassificationDataset(test_data, self.vocab, transforms)
+        self.test = TextClassificationDataset(self.vocab, test_data, self.labels)
 
     def get_tuples(
         self,
@@ -89,10 +85,11 @@ class MIMICIIIDataModule(pl.LightningDataModule):
 
         for (_label, _text) in batch:
 
-            label_list.append(_label)
+            label_list.append(self.label_transform(_label))
 
-            text_list.append(_text)
-            offsets.append(_text.size(0))
+            txt = self.text_transform(_text)
+            text_list.append(txt)
+            offsets.append(txt.size(0))
 
         return (
             torch.tensor(label_list),
@@ -103,8 +100,8 @@ class MIMICIIIDataModule(pl.LightningDataModule):
     def collate_padded(self, batch):
         label_list, text_list = [], []
         for (_label, _text) in batch:
-            label_list.append(_label)
-            text_list.append(_text)
+            label_list.append(self.label_transform(_label))
+            text_list.append(self.text_transform(_text))
         return torch.tensor(label_list), pad_sequence(text_list)
 
     def get_dataloader(self, dataset, shuffle=False):
