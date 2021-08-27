@@ -13,8 +13,8 @@ source .venv/bin/activate
 export TOKENIZERS_PARALLELISM=false
 
 ipython -m src.clinical_longformer.model.bert -- \
-    /mnt/lustre/users/ynurmahomed/datasets/discharge/2048 \
-    --bert_pretrained_path=/mnt/lustre/users/ynurmahomed/.data/pretraining_output/bert_uncased_L-12_H-768_A-12-2048/2048/ \
+    /mnt/lustre/users/ynurmahomed/datasets/discharge/512 \
+    --bert_pretrained_path=/mnt/lustre/users/ynurmahomed/.data/pretraining_output/bert_uncased_L-12_H-768_A-12/512 \
     --logdir=/mnt/lustre/users/ynurmahomed/lightning_logs \
     --batch_size=16 \
     --lr=3e-5 \

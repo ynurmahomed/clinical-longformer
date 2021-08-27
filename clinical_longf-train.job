@@ -3,7 +3,7 @@
 #PBS -q gpu_1
 #PBS -o /mnt/lustre/users/ynurmahomed/logs/clinical_longf-train/
 #PBS -e /mnt/lustre/users/ynurmahomed/logs/clinical_longf-train/
-#PBS -l walltime=00:15:00
+#PBS -l walltime=00:30:00
 #PBS -WMail_Users=nrmyas001@myuct.ac.za
 
 module load chpc/python/3.7.0
@@ -11,13 +11,14 @@ cd /mnt/lustre/users/ynurmahomed/clinical-longformer
 source .venv/bin/activate
 
 export TOKENIZERS_PARALLELISM=False
+export SEQ_LEN=2048
 
 ipython -m src.clinical_longformer.model.bert -- \
-    /mnt/lustre/users/ynurmahomed/datasets/discharge/2048 \
-    --bert_pretrained_path=/mnt/lustre/users/ynurmahomed/.data/pretraining_output/bert_uncased_L-12_H-768_A-12-2048/2048/checkpoint-100000 \
+    /mnt/lustre/users/ynurmahomed/datasets/discharge/$SEQ_LEN \
+    --bert_pretrained_path=/mnt/lustre/users/ynurmahomed/.data/pretraining_output/bert_uncased_L-12_H-768_A-12-$SEQ_LEN/$SEQ_LEN \
     --logdir=/mnt/lustre/users/ynurmahomed/lightning_logs \
     --batch_size=16 \
-    --lr=3e-5 \
+    --lr=5e-5 \
     --max_epochs=3 \
     --num_workers=6 \
     --gpus=1
