@@ -62,7 +62,7 @@ class BertPretrainedModule(pl.LightningModule):
         self.bert_pretrained_model.classifier = nn.Sequential(
             nn.Linear(self.bert_pretrained_model.config.hidden_size, 2048),
             nn.Linear(2048, 768),
-            nn.Linear(768, self.bert_pretrained_model.config.num_labels)
+            nn.Linear(768, self.bert_pretrained_model.config.num_labels),
         )
 
         self.sigmoid = nn.Sigmoid()
@@ -102,7 +102,7 @@ class BertPretrainedModule(pl.LightningModule):
             default=0.1,
             type=float,
             help="Proportion of training to perform linear learning rate warmup for. "
-                    "E.g., 0.1 = 10%% of training."
+            "E.g., 0.1 = 10%% of training.",
         )
 
         return parent_parser
@@ -112,7 +112,14 @@ class BertPretrainedModule(pl.LightningModule):
         hparams = vars(namespace)
         return {
             k: hparams[k]
-            for k in hparams.keys() & {"lr", "bert_pretrained_path", "batch_size", "lr_scheduler_type", "warmup_proportion"}
+            for k in hparams.keys()
+            & {
+                "lr",
+                "bert_pretrained_path",
+                "batch_size",
+                "lr_scheduler_type",
+                "warmup_proportion",
+            }
         }
 
     def forward(self, labels, encodings):
@@ -289,6 +296,20 @@ def add_arguments():
     return parser
 
 
+def setup_lr_scheduler(model, datamodule, args):
+    n_batches = len(datamodule.train_dataloader())
+    n_devices = args.gpus if args.gpus else 1  # cpu or tpu_cores
+    num_training_steps = (
+        n_batches // args.accumulate_grad_batches * args.max_epochs // n_devices
+    )
+    model.num_training_steps = num_training_steps
+    model.num_warmup_steps = int(args.warmup_proportion * num_training_steps)
+
+    _logger.info(
+        f"n_batches={n_batches}\n batch_size * gpus={args.batch_size * max(1, (args.gpus or 0))}\n max_epochs={args.max_epochs}\n num_training_steps={num_training_steps}\n num_warmup_steps={model.num_warmup_steps}"
+    )
+
+
 def main(args):
 
     parser = add_arguments()
@@ -300,21 +321,15 @@ def main(args):
     )
 
     model = BertPretrainedModule(
-        args.bert_pretrained_path, dm.labels, BertPretrainedModule.get_model_hparams(args)
+        args.bert_pretrained_path,
+        dm.labels,
+        BertPretrainedModule.get_model_hparams(args),
     )
 
-    # Setup lr scheduler
-    n_batches = len(dm.train_dataloader())
-    n_devices = args.gpus if args.gpus else 1  # cpu or tpu_cores
-    num_training_steps = n_batches // args.accumulate_grad_batches * args.max_epochs // n_devices
-    model.num_training_steps = num_training_steps
-    model.num_warmup_steps = int(args.warmup_proportion*num_training_steps)
+    if args.lr_scheduler_type is not None:
+        setup_lr_scheduler(model, dm, args)
 
-    lr_monitor = LearningRateMonitor(logging_interval='step')
-
-    print(
-        f"n_batches={n_batches}\n batch_size * gpus={args.batch_size * max(1, (args.gpus or 0))}\n max_epochs={args.max_epochs}\n num_training_steps={num_training_steps}\n num_warmup_steps={model.num_warmup_steps}"
-    )
+    lr_monitor = LearningRateMonitor(logging_interval="step")
 
     logger = TensorBoardLogger(
         args.logdir, name="ClinicalBERT", default_hp_metric=False
