@@ -7,7 +7,7 @@
 #SBATCH --mail-type=ALL
 #SBATCH --time=00:30:00
 
-module load python/anaconda-python-3.7
+module load software/TensorFlow-A100-GPU
 
 export CUDA_VISIBLE_DEVICES=$(ncvd)
 export TOKENIZERS_PARALLELISM=false
@@ -16,8 +16,8 @@ python -m src.clinical_longformer.model.bert  \
     /scratch/nrmyas001/datasets/discharge/512 \
     --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12/512/ \
     --logdir=/scratch/nrmyas001/lightning_logs \
-    --batch_size=16 \
-    --lr=3e-5 \
+    --batch_size=40 \
+    --lr=2e-5 \
     --max_epochs=3 \
     --num_workers=6 \
     --gpus=1 > /scratch/nrmyas001/logs/clinical_bert-train/$(hostname)$(openssl rand -hex 4).out
