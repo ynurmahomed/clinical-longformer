@@ -156,7 +156,12 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.log("Loss/train", loss)
 
-        return {"loss": loss, "hadm_id": hadm_id, "preds": preds, "target": y}
+        return {
+            "loss": loss,
+            "hadm_id": hadm_id.detach(),
+            "preds": preds.detach(),
+            "target": y.detach(),
+        }
 
     def training_epoch_end(self, outputs):
 
@@ -326,16 +331,17 @@ def main(args):
         BertPretrainedModule.get_model_hparams(args),
     )
 
+    callbacks = []
     if args.lr_scheduler_type is not None:
         setup_lr_scheduler(model, dm, args)
-
-    lr_monitor = LearningRateMonitor(logging_interval="step")
+        lr_monitor = LearningRateMonitor(logging_interval="step")
+        callbacks.append(lr_monitor)
 
     logger = TensorBoardLogger(
         args.logdir, name="ClinicalBERT", default_hp_metric=False
     )
 
-    trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=[lr_monitor])
+    trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=callbacks)
 
     set_example_input_array(dm, model)
 
