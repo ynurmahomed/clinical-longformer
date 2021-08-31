@@ -13,13 +13,24 @@ from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler, PopulationBasedTraining
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
-from ..model.bert import BertPretrainedModule, get_data_module, add_arguments, setup_lr_scheduler
+from ..model.bert import (
+    BertPretrainedModule,
+    get_data_module,
+    add_arguments,
+    setup_lr_scheduler,
+)
 from .utils import trial_name_string
 
 
 def train_tune(config, args):
 
-    dm = get_data_module(args.mimic_path, args.bert_pretrained_path, config["batch_size"], args.num_workers)
+    dm = get_data_module(
+        args.mimic_path,
+        args.bert_pretrained_path,
+        config["batch_size"],
+        args.max_length,
+        args.num_workers,
+    )
 
     model = BertPretrainedModule(args.bert_pretrained_path, dm.labels, config)
 
@@ -62,7 +73,7 @@ def tune_clinical_bert(args):
             "lr",
             "batch_size",
             "lr_scheduler_type",
-            "warmup_proportion", 
+            "warmup_proportion",
         ],
         metric_columns=["loss", "AUC-PR", "training_iteration"],
     )
