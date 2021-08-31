@@ -87,6 +87,12 @@ class BertPretrainedModule(pl.LightningModule):
             type=str,
             default=BERT_PRETRAINED_PATH,
         )
+        parser.add_argument(
+            "--max_length",
+            help="Max input length",
+            type=int,
+            default=MAX_LENGTH,
+        )
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
         parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
         parser.add_argument(
@@ -254,11 +260,13 @@ class BertPretrainedModule(pl.LightningModule):
         return optimizer
 
 
-def get_data_module(mimic_path, bert_pretrained_path, batch_size, num_workers):
+def get_data_module(
+    mimic_path, bert_pretrained_path, batch_size, max_length, num_workers
+):
     p = Path(mimic_path)
     tokenizer = AutoTokenizer.from_pretrained(bert_pretrained_path)
     dm = TransformerMIMICIIIDataModule(
-        p, batch_size, tokenizer, MAX_LENGTH, num_workers
+        p, batch_size, tokenizer, max_length, num_workers
     )
     dm.setup()
     return dm
@@ -322,7 +330,11 @@ def main(args):
     args = parser.parse_args(args)
 
     dm = get_data_module(
-        args.mimic_path, args.bert_pretrained_path, args.batch_size, args.num_workers
+        args.mimic_path,
+        args.bert_pretrained_path,
+        args.batch_size,
+        args.max_length,
+        args.num_workers,
     )
 
     model = BertPretrainedModule(
