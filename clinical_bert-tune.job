@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --account=compsci --partition=a100
+#SBATCH --account=nlpgroup --partition=a100
 #SBATCH --nodes=1 --ntasks=6
 #SBATCH --gres=gpu:ampere:1
 #SBATCH --job-name="clinical_bert-tune"

@@ -1,16 +1,16 @@
-#PBS -l select=1:ncpus=10:ngpus=1
-#PBS -P CSCI1335
-#PBS -q gpu_1
-#PBS -o /mnt/lustre/users/ynurmahomed/logs/clinical_longf-train/
-#PBS -e /mnt/lustre/users/ynurmahomed/logs/clinical_longf-train/
-#PBS -l walltime=00:30:00
-#PBS -WMail_Users=nrmyas001@myuct.ac.za
+#!/bin/sh
+#SBATCH --account=nlpgroup --partition=a100
+#SBATCH --nodes=1 --ntasks=6
+#SBATCH --gres=gpu:ampere:1
+#SBATCH --job-name="clinical_bert-tune"
+#SBATCH --mail-user=nrmyas001@cs.uct.ac.za
+#SBATCH --mail-type=ALL
+#SBATCH --time=00:10:00
 
-module load python/anaconda-python-3.7
-cd /home/nrmyas001/clinical-longformer
-source .venv/bin/activate
+module load software/TensorFlow-A100-GPU
 
-export TOKENIZERS_PARALLELISM=False
+export CUDA_VISIBLE_DEVICES=$(ncvd)
+export TOKENIZERS_PARALLELISM=false
 export SEQ_LEN=2048
 
 python -m src.clinical_longformer.model.bert \
