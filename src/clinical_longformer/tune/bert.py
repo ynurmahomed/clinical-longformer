@@ -63,7 +63,7 @@ def tune_clinical_bert(args):
         "lr": tune.loguniform(2e-5, 5e-5),
         "batch_size": tune.choice([20, 30, 40]),
         "lr_scheduler_type": tune.choice([None, "linear", "polynomial"]),
-        "warmup_proportion": tune.loguniform(0.1, 0.5),
+        "warmup_proportion": tune.loguniform(0.1, 0.3),
     }
 
     scheduler = ASHAScheduler(max_t=args.max_epochs, grace_period=1, reduction_factor=2)
