@@ -36,7 +36,7 @@ def train_tune(config, args):
 
     if config["lr_scheduler_type"] is not None:
         args.lr_scheduler_type = config["lr_scheduler_type"]
-        args.warmpup_proportion = config["warmup_proportion"]
+        args.warmup_proportion = config["warmup_proportion"]
         setup_lr_scheduler(model, dm, args)
 
     logger = TensorBoardLogger(
