@@ -106,6 +106,13 @@ class BertPretrainedModule(pl.LightningModule):
             # choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"],
         )
         parser.add_argument(
+            "--warmup_proportion",
+            default=0.1,
+            type=float,
+            help="Proportion of training to perform linear learning rate warmup for. "
+            "E.g., 0.1 = 10%% of training.",
+        )
+        parser.add_argument(
             "--attention_probs_dropout_prob",
             default=0.1,
             type=float,
