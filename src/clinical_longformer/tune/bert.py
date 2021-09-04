@@ -61,7 +61,7 @@ def tune_clinical_bert(args):
 
     config = {
         "lr": tune.loguniform(2e-5, 5e-5),
-        "batch_size": tune.choice([20, 30, 40]),
+        "batch_size": tune.choice([16, 24, 32, 40]),
         "lr_scheduler_type": tune.choice([None, "linear", "polynomial"]),
         "warmup_proportion": tune.loguniform(0.1, 0.5),
     }
