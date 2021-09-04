@@ -55,7 +55,10 @@ class BertPretrainedModule(pl.LightningModule):
 
         # BERT type Model
         self.bert_pretrained_model = AutoModelForSequenceClassification.from_pretrained(
-            bert_pretrained_path, num_labels=1
+            bert_pretrained_path,
+            num_labels=1,
+            attention_probs_dropout_prob=self.hparams.attention_probs_dropout_prob,
+            hidden_dropout_prob=self.hparams.hidden_dropout_prob,
         )
 
         # 3 layer classifier like in Huang, K., Altosaar, J., & Ranganath, R. (2019).
@@ -102,13 +105,17 @@ class BertPretrainedModule(pl.LightningModule):
             help="The scheduler type to use.",
             # choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"],
         )
-
         parser.add_argument(
-            "--warmup_proportion",
+            "--attention_probs_dropout_prob",
             default=0.1,
             type=float,
-            help="Proportion of training to perform linear learning rate warmup for. "
-            "E.g., 0.1 = 10%% of training.",
+            help="The dropout ratio for the attention probabilities.",
+        )
+        parser.add_argument(
+            "--hidden_dropout_prob",
+            default=0.1,
+            type=float,
+            help="The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.",
         )
 
         return parent_parser
@@ -125,6 +132,8 @@ class BertPretrainedModule(pl.LightningModule):
                 "batch_size",
                 "lr_scheduler_type",
                 "warmup_proportion",
+                "attention_probs_dropout_prob",
+                "hidden_dropout_prob",
             }
         }
 
