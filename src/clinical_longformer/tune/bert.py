@@ -61,7 +61,7 @@ def tune_clinical_bert(args):
 
     config = {
         "lr": tune.loguniform(2e-5, 5e-5),
-        "batch_size": tune.choice([16, 24, 32, 40]),
+        "batch_size": tune.choice([8, 16, 24, 32]),
         "lr_scheduler_type": tune.choice([None, "linear", "polynomial"]),
         "warmup_proportion": tune.loguniform(0.1, 0.5),
         "attention_probs_dropout_prob": tune.loguniform(0.1, 0.5),
@@ -76,6 +76,8 @@ def tune_clinical_bert(args):
             "batch_size",
             "lr_scheduler_type",
             "warmup_proportion",
+            "attention_probs_dropout_prob",
+            "hidden_dropout_prob",
         ],
         metric_columns=["loss", "AUC-PR", "training_iteration"],
     )
