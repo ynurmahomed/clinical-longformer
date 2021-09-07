@@ -10,7 +10,7 @@ import torchmetrics
 from argparse import ArgumentParser
 from pathlib import Path
 from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping
 from transformers import (
     AdamW,
     AutoTokenizer,
@@ -360,10 +360,14 @@ def main(args):
     )
 
     callbacks = []
+
+    # Setup learning rate scheduler
     if args.lr_scheduler_type is not None:
         setup_lr_scheduler(model, dm, args)
-        lr_monitor = LearningRateMonitor(logging_interval="step")
-        callbacks.append(lr_monitor)
+        callbacks.append(LearningRateMonitor(logging_interval="step"))
+
+    # Setup early stopping
+    callbacks.append(EarlyStopping('Loss/valid', stopping_threshold=0.65))
 
     logger = TensorBoardLogger(
         args.logdir, name="ClinicalBERT", default_hp_metric=False
