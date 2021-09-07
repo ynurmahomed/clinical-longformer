@@ -5,7 +5,7 @@
 #SBATCH --job-name="clinical_bert-tune"
 #SBATCH --mail-user=nrmyas001@cs.uct.ac.za
 #SBATCH --mail-type=ALL
-#SBATCH --time=05:00:00
+#SBATCH --time=02:00:00
 
 module load software/TensorFlow-A100-GPU
 
@@ -16,8 +16,8 @@ python -m src.clinical_longformer.tune.bert  \
     /scratch/nrmyas001/datasets/discharge/512 \
     --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12/512/ \
     --local_dir=/scratch/nrmyas001/ray_results \
-    --num_samples=10 \
+    --num_samples=20 \
     --max_epochs=3 \
     --num_workers=6 \
-    --gpus=1 > /scratch/nrmyas001/logs/clinical_bert-tune/$(hostname)$(openssl rand -hex 4).out
+    --gpus=1 &> /scratch/nrmyas001/logs/clinical_bert-tune/$(hostname)$(openssl rand -hex 4).out
 

@@ -5,7 +5,7 @@
 #SBATCH --job-name="clinical_bert-train"
 #SBATCH --mail-user=nrmyas001@cs.uct.ac.za
 #SBATCH --mail-type=ALL
-#SBATCH --time=00:30:00
+#SBATCH --time=00:05:00
 
 module load software/TensorFlow-A100-GPU
 
