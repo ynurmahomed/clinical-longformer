@@ -70,7 +70,7 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.sigmoid = nn.Sigmoid()
 
-        self.bce_loss = F.binary_cross_entropy
+        self.bce_loss = nn.BCEWithLogitsLoss()
 
         # Metrics
         pr_curve = ClinicalBERTBinnedPRCurve()
@@ -161,9 +161,7 @@ class BertPretrainedModule(pl.LightningModule):
             labels=labels.unsqueeze(1),
         )
 
-        sigmoid = self.sigmoid(output.logits)
-
-        return sigmoid
+        return output.logits
 
     def on_train_start(self):
         self.logger.log_hyperparams(self.hparams, {"AUC-PR/valid": 0})
