@@ -59,7 +59,7 @@ def train_tune(config, args):
 
 def tune_clinical_bert(args):
 
-    dropout_dist = tune.randn(0.1, 0.9)
+    dropout_dist = tune.uniform(0.1, 0.9)
 
     config = {
         "lr": tune.loguniform(2e-3, 5e-5),
