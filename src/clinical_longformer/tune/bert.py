@@ -59,15 +59,13 @@ def train_tune(config, args):
 
 def tune_clinical_bert(args):
 
-    dropout_dist = tune.uniform(0.1, 0.9)
-
     config = {
         "lr": tune.loguniform(2e-3, 5e-5),
         "batch_size": tune.choice([8, 16]),
         "lr_scheduler_type": tune.choice([None, "linear"]),
         "warmup_proportion": tune.loguniform(0.1, 0.3),
-        "attention_probs_dropout_prob": dropout_dist,
-        "hidden_dropout_prob": dropout_dist,
+        "attention_probs_dropout_prob": tune.uniform(0.1, 0.9),
+        "hidden_dropout_prob": tune.sample_from(lambda spec: spec.config.attention_probs_dropout_prob),
     }
 
     scheduler = ASHAScheduler(max_t=args.max_epochs, grace_period=1, reduction_factor=2)
