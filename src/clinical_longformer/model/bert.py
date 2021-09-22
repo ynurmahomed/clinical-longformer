@@ -221,6 +221,10 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.log("AUC-PR/valid", auc_pr(precision, recall))
 
+        self.log("Precision/valid", precision[0])
+
+        self.log("Recall/valid", recall[0])
+
     def test_step(self, batch, batch_idx):
 
         hadm_id, y, x = batch
@@ -248,6 +252,10 @@ class BertPretrainedModule(pl.LightningModule):
         fig = plot_pr_curve(precision, recall)
 
         self.log("AUC-PR/test", auc_pr(precision, recall))
+
+        self.log("Precision/test", precision[0])
+
+        self.log("Recall/test", recall[0])
 
         self.logger.experiment.add_figure("PR Curve/test", fig, self.current_epoch)
 
