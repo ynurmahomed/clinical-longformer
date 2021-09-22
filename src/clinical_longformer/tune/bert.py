@@ -13,15 +13,31 @@ from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler, PopulationBasedTraining
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
-from ..model.clinical_bert import BertPretrainedModule, get_data_module, add_arguments
+from ..model.bert import (
+    BertPretrainedModule,
+    get_data_module,
+    add_arguments,
+    setup_lr_scheduler,
+)
 from .utils import trial_name_string
 
 
-def train_tune(config, mimic_path, bert_pretrained_path, num_workers, max_epochs, gpus, logdir):
+def train_tune(config, args):
 
-    dm = get_data_module(mimic_path, bert_pretrained_path, config["batch_size"], num_workers)
+    dm = get_data_module(
+        args.mimic_path,
+        args.bert_pretrained_path,
+        config["batch_size"],
+        args.max_length,
+        args.num_workers,
+    )
 
-    model = BertPretrainedModule(bert_pretrained_path, dm.labels, config)
+    model = BertPretrainedModule(args.bert_pretrained_path, dm.labels, config)
+
+    if config["lr_scheduler_type"] is not None:
+        args.lr_scheduler_type = config["lr_scheduler_type"]
+        args.warmup_proportion = config["warmup_proportion"]
+        setup_lr_scheduler(model, dm, args)
 
     logger = TensorBoardLogger(
         tune.get_trial_dir(), name="", version=".", default_hp_metric=False
@@ -32,8 +48,8 @@ def train_tune(config, mimic_path, bert_pretrained_path, num_workers, max_epochs
     )
 
     trainer = pl.Trainer(
-        max_epochs=max_epochs,
-        gpus=math.ceil(gpus),
+        max_epochs=args.max_epochs,
+        gpus=math.ceil(args.gpus),
         logger=logger,
         callbacks=[tune_callback],
     )
@@ -44,8 +60,12 @@ def train_tune(config, mimic_path, bert_pretrained_path, num_workers, max_epochs
 def tune_clinical_bert(args):
 
     config = {
-        "lr": tune.loguniform(5e-6, 5e-5),
-        "batch_size": tune.choice([4, 8, 16]),
+        "lr": tune.loguniform(2e-3, 5e-5),
+        "batch_size": tune.choice([8, 16]),
+        "lr_scheduler_type": tune.choice([None, "linear"]),
+        "warmup_proportion": tune.loguniform(0.1, 0.3),
+        "attention_probs_dropout_prob": tune.uniform(0.1, 0.9),
+        "hidden_dropout_prob": tune.sample_from(lambda spec: spec.config.attention_probs_dropout_prob),
     }
 
     scheduler = ASHAScheduler(max_t=args.max_epochs, grace_period=1, reduction_factor=2)
@@ -54,18 +74,15 @@ def tune_clinical_bert(args):
         parameter_columns=[
             "lr",
             "batch_size",
+            "lr_scheduler_type",
+            "warmup_proportion",
         ],
         metric_columns=["loss", "AUC-PR", "training_iteration"],
     )
 
     trainable = tune.with_parameters(
         train_tune,
-        mimic_path=args.mimic_path,
-        bert_pretrained_path=args.bert_pretrained_path,
-        num_workers=args.num_workers,
-        max_epochs=args.max_epochs,
-        gpus=args.gpus,
-        logdir=args.logdir,
+        args=args,
     )
 
     tune.run(

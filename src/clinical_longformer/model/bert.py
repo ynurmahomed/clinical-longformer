@@ -1,3 +1,4 @@
+import logging
 import os
 import pytorch_lightning as pl
 import sys
@@ -9,16 +10,20 @@ import torchmetrics
 from argparse import ArgumentParser
 from pathlib import Path
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping
 from transformers import (
     AdamW,
     AutoTokenizer,
     AutoModelForSequenceClassification,
+    SchedulerType,
+    get_scheduler,
 )
 
 from ..data.module import TransformerMIMICIIIDataModule
 from .metrics import ClinicalBERTBinnedPRCurve
 from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
+_logger = logging.getLogger(__name__)
 
 MAX_LENGTH = 512
 BERT_PRETRAINED_PATH = ".data/model/pretraining"
@@ -48,14 +53,24 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.save_hyperparameters(hparams, ignore=["bert_pretrained_path", "labels"])
 
-        # Model
+        # BERT type Model
         self.bert_pretrained_model = AutoModelForSequenceClassification.from_pretrained(
-            bert_pretrained_path, num_labels=1
+            bert_pretrained_path,
+            num_labels=1,
+            attention_probs_dropout_prob=self.hparams.attention_probs_dropout_prob,
+            hidden_dropout_prob=self.hparams.hidden_dropout_prob,
+        )
+
+        # 3 layer classifier like in Huang, K., Altosaar, J., & Ranganath, R. (2019).
+        self.bert_pretrained_model.classifier = nn.Sequential(
+            nn.Linear(self.bert_pretrained_model.config.hidden_size, 2048),
+            nn.Linear(2048, 768),
+            nn.Linear(768, self.bert_pretrained_model.config.num_labels),
         )
 
         self.sigmoid = nn.Sigmoid()
 
-        self.bce_loss = F.binary_cross_entropy
+        self.bce_loss = nn.BCEWithLogitsLoss()
 
         # Metrics
         pr_curve = ClinicalBERTBinnedPRCurve()
@@ -75,8 +90,41 @@ class BertPretrainedModule(pl.LightningModule):
             type=str,
             default=BERT_PRETRAINED_PATH,
         )
+        parser.add_argument(
+            "--max_length",
+            help="Max input length",
+            type=int,
+            default=MAX_LENGTH,
+        )
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
         parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
+        parser.add_argument(
+            "--lr_scheduler_type",
+            type=SchedulerType,
+            default=None,
+            help="The scheduler type to use.",
+            # choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"],
+        )
+        parser.add_argument(
+            "--warmup_proportion",
+            default=0.1,
+            type=float,
+            help="Proportion of training to perform linear learning rate warmup for. "
+            "E.g., 0.1 = 10%% of training.",
+        )
+        parser.add_argument(
+            "--attention_probs_dropout_prob",
+            default=0.1,
+            type=float,
+            help="The dropout ratio for the attention probabilities.",
+        )
+        parser.add_argument(
+            "--hidden_dropout_prob",
+            default=0.1,
+            type=float,
+            help="The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.",
+        )
+
         return parent_parser
 
     @staticmethod
@@ -84,7 +132,16 @@ class BertPretrainedModule(pl.LightningModule):
         hparams = vars(namespace)
         return {
             k: hparams[k]
-            for k in hparams.keys() & {"lr", "bert_pretrained_path", "batch_size"}
+            for k in hparams.keys()
+            & {
+                "lr",
+                "bert_pretrained_path",
+                "batch_size",
+                "lr_scheduler_type",
+                "warmup_proportion",
+                "attention_probs_dropout_prob",
+                "hidden_dropout_prob",
+            }
         }
 
     def forward(self, labels, encodings):
@@ -104,9 +161,7 @@ class BertPretrainedModule(pl.LightningModule):
             labels=labels.unsqueeze(1),
         )
 
-        sigmoid = self.sigmoid(output.logits)
-
-        return sigmoid
+        return output.logits
 
     def on_train_start(self):
         self.logger.log_hyperparams(self.hparams, {"AUC-PR/valid": 0})
@@ -121,7 +176,12 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.log("Loss/train", loss)
 
-        return {"loss": loss, "hadm_id": hadm_id, "preds": preds, "target": y}
+        return {
+            "loss": loss,
+            "hadm_id": hadm_id.detach(),
+            "preds": preds.detach(),
+            "target": y.detach(),
+        }
 
     def training_epoch_end(self, outputs):
 
@@ -200,14 +260,27 @@ class BertPretrainedModule(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        return AdamW(self.parameters(), lr=self.hparams.lr)
+        optimizer = AdamW(self.parameters(), lr=self.hparams.lr)
+
+        if self.hparams.lr_scheduler_type is not None:
+            lr_scheduler = get_scheduler(
+                name=self.hparams.lr_scheduler_type,
+                optimizer=optimizer,
+                num_warmup_steps=self.num_warmup_steps,
+                num_training_steps=self.num_training_steps,
+            )
+            return [optimizer], [{"scheduler": lr_scheduler, "interval": "step"}]
+
+        return optimizer
 
 
-def get_data_module(mimic_path, bert_pretrained_path, batch_size, num_workers):
+def get_data_module(
+    mimic_path, bert_pretrained_path, batch_size, max_length, num_workers
+):
     p = Path(mimic_path)
     tokenizer = AutoTokenizer.from_pretrained(bert_pretrained_path)
     dm = TransformerMIMICIIIDataModule(
-        p, batch_size, tokenizer, MAX_LENGTH, num_workers
+        p, batch_size, tokenizer, max_length, num_workers
     )
     dm.setup()
     return dm
@@ -250,6 +323,20 @@ def add_arguments():
     return parser
 
 
+def setup_lr_scheduler(model, datamodule, args):
+    n_batches = len(datamodule.train_dataloader())
+    n_devices = args.gpus if args.gpus else 1  # cpu or tpu_cores
+    num_training_steps = (
+        n_batches // args.accumulate_grad_batches * args.max_epochs // n_devices
+    )
+    model.num_training_steps = num_training_steps
+    model.num_warmup_steps = int(args.warmup_proportion * num_training_steps)
+
+    _logger.info(
+        f"n_batches={n_batches}\n batch_size * gpus={args.batch_size * max(1, (args.gpus or 0))}\n max_epochs={args.max_epochs}\n num_training_steps={num_training_steps}\n num_warmup_steps={model.num_warmup_steps}"
+    )
+
+
 def main(args):
 
     parser = add_arguments()
@@ -257,18 +344,34 @@ def main(args):
     args = parser.parse_args(args)
 
     dm = get_data_module(
-        args.mimic_path, args.bert_pretrained_path, args.batch_size, args.num_workers
+        args.mimic_path,
+        args.bert_pretrained_path,
+        args.batch_size,
+        args.max_length,
+        args.num_workers,
     )
 
     model = BertPretrainedModule(
-        args.bert_pretrained_path, dm.labels, BertPretrainedModule.get_model_hparams(args)
+        args.bert_pretrained_path,
+        dm.labels,
+        BertPretrainedModule.get_model_hparams(args),
     )
+
+    callbacks = []
+
+    # Setup learning rate scheduler
+    if args.lr_scheduler_type is not None:
+        setup_lr_scheduler(model, dm, args)
+        callbacks.append(LearningRateMonitor(logging_interval="step"))
+
+    # Setup early stopping
+    callbacks.append(EarlyStopping('Loss/valid', stopping_threshold=0.65))
 
     logger = TensorBoardLogger(
         args.logdir, name="ClinicalBERT", default_hp_metric=False
     )
 
-    trainer = pl.Trainer.from_argparse_args(args, logger=logger)
+    trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=callbacks)
 
     set_example_input_array(dm, model)
 

@@ -46,5 +46,5 @@ class ClinicalBERTBinnedPRCurve(Metric):
         target = groupby.target.first()
 
         return precision_recall_curve(
-            torch.tensor(p_readmit.values), torch.tensor(target.values)
+            torch.tensor(p_readmit.values), torch.tensor(target.values), pos_label=1
         )
