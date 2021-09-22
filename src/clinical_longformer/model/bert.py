@@ -10,7 +10,7 @@ import torchmetrics
 from argparse import ArgumentParser
 from pathlib import Path
 from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping
 from transformers import (
     AdamW,
     AutoTokenizer,
@@ -219,6 +219,10 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.log("AUC-PR/valid", auc_pr(precision, recall))
 
+        self.log("Precision/valid", precision[0])
+
+        self.log("Recall/valid", recall[0])
+
     def test_step(self, batch, batch_idx):
 
         hadm_id, y, x = batch
@@ -246,6 +250,10 @@ class BertPretrainedModule(pl.LightningModule):
         fig = plot_pr_curve(precision, recall)
 
         self.log("AUC-PR/test", auc_pr(precision, recall))
+
+        self.log("Precision/test", precision[0])
+
+        self.log("Recall/test", recall[0])
 
         self.logger.experiment.add_figure("PR Curve/test", fig, self.current_epoch)
 
@@ -358,10 +366,14 @@ def main(args):
     )
 
     callbacks = []
+
+    # Setup learning rate scheduler
     if args.lr_scheduler_type is not None:
         setup_lr_scheduler(model, dm, args)
-        lr_monitor = LearningRateMonitor(logging_interval="step")
-        callbacks.append(lr_monitor)
+        callbacks.append(LearningRateMonitor(logging_interval="step"))
+
+    # Setup early stopping
+    callbacks.append(EarlyStopping('Loss/valid', stopping_threshold=0.65))
 
     logger = TensorBoardLogger(
         args.logdir, name="ClinicalBERT", default_hp_metric=False
