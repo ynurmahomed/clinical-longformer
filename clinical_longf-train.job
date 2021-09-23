@@ -17,9 +17,10 @@ export SEQ_LEN=1024
 for i in {1..5}
 do
 python -m src.clinical_longformer.model.bert \
-    /scrath/nrmyas001/datasets/discharge/$SEQ_LEN \
-    --bert_pretrained_path=/scratch/nrmyas001/.data/pretraining_output/bert_uncased_L-12_H-768_A-12-$SEQ_LEN/$SEQ_LEN \
-    --logdir=/mnt/lustre/users/ynurmahomed/lightning_logs \
+    /scratch/nrmyas001/datasets/discharge/$SEQ_LEN \
+    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12-$SEQ_LEN/$SEQ_LEN \
+    --max_length=$SEQ_LEN \
+    --logdir=/scratch/nrmyas001/lightning_logs \
     --val_check_interval=50 \
     --batch_size=16 \
     --lr=2e-5 \
