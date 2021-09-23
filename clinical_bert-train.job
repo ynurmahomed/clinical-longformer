@@ -2,23 +2,31 @@
 #SBATCH --account=nlpgroup --partition=a100
 #SBATCH --nodes=1 --ntasks=6
 #SBATCH --gres=gpu:ampere:1
-#SBATCH --job-name="clinical_bert-train"
+#SBATCH --job-name="bert-train"
 #SBATCH --mail-user=nrmyas001@cs.uct.ac.za
 #SBATCH --mail-type=ALL
-#SBATCH --time=00:05:00
+#SBATCH --time=00:40:00
 
 module load software/TensorFlow-A100-GPU
 
 export CUDA_VISIBLE_DEVICES=$(ncvd)
 export TOKENIZERS_PARALLELISM=false
 
+for i in {1..5}
+do
 python -m src.clinical_longformer.model.bert  \
     /scratch/nrmyas001/datasets/discharge/512 \
-    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12/512/ \
+    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12/512/checkpoint-100000 \
     --logdir=/scratch/nrmyas001/lightning_logs \
-    --batch_size=40 \
-    --lr=2e-5 \
     --max_epochs=3 \
+    --val_check_interval=50 \
+    --batch_size=16 \
+    --lr=2e-5 \
+    --lr_scheduler_type=linear \
+    --warmup_proportion=0.1 \
+    --attention_probs_dropout_prob=0.1 \
+    --hidden_dropout_prob=0.1 \
     --num_workers=6 \
-    --gpus=1 > /scratch/nrmyas001/logs/clinical_bert-train/$(hostname)$(openssl rand -hex 4).out
-
+    --precision=16 \
+    --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/bert-train/$(hostname)$(openssl rand -hex 4).out
+done
