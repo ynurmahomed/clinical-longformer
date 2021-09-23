@@ -18,6 +18,7 @@ from transformers import (
     SchedulerType,
     get_scheduler,
 )
+from torchmetrics import AveragePrecision, MetricCollection, Precision, Recall
 
 from ..data.module import TransformerMIMICIIIDataModule
 from .metrics import ClinicalBERTBinnedPRCurve
@@ -74,10 +75,17 @@ class BertPretrainedModule(pl.LightningModule):
 
         # Metrics
         pr_curve = ClinicalBERTBinnedPRCurve()
+        # Using separate metric collection as inputs for the following
+        # are different
+        metrics = MetricCollection([AveragePrecision(), Precision(), Recall()])
 
         self.train_pr_curve = pr_curve.clone()
+
         self.valid_pr_curve = pr_curve.clone()
+        self.valid_metrics = metrics.clone()
+
         self.test_pr_curve = pr_curve.clone()
+        self.test_metrics = metrics.clone()
 
         self.confmat = torchmetrics.ConfusionMatrix(2, normalize="true")
 
@@ -164,7 +172,9 @@ class BertPretrainedModule(pl.LightningModule):
         return output.logits
 
     def on_train_start(self):
-        self.logger.log_hyperparams(self.hparams, {"AUC-PR/valid": 0})
+        self.logger.log_hyperparams(
+            self.hparams, {"AUC-PR/train": 0, "AUC-PR/valid": 0, "AUC-PR/test": 0}
+        )
 
     def training_step(self, batch, batch_idx):
 
@@ -217,11 +227,15 @@ class BertPretrainedModule(pl.LightningModule):
 
         precision, recall, _ = self.valid_pr_curve(hadm_ids, preds, target)
 
+        metrics = self.valid_metrics(preds, target.int())
+
         self.log("AUC-PR/valid", auc_pr(precision, recall))
 
-        self.log("Precision/valid", precision[0])
+        self.log("AVG-Precision/valid", metrics["AveragePrecision"])
 
-        self.log("Recall/valid", recall[0])
+        self.log("Precision/valid", metrics["Precision"])
+
+        self.log("Recall/valid", metrics["Recall"])
 
     def test_step(self, batch, batch_idx):
 
@@ -235,27 +249,31 @@ class BertPretrainedModule(pl.LightningModule):
 
         hadm_ids = torch.cat([o["hadm_id"] for o in outputs])
 
-        y = torch.cat([o["target"] for o in outputs])
+        target = torch.cat([o["target"] for o in outputs])
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        self.log_pr_curve(hadm_ids, preds, y)
+        self.log_test_metrics(hadm_ids, preds, target)
 
-        self.log_confusion_matrix(preds, y)
+    def log_test_metrics(self, hadm_ids, preds, target):
 
-    def log_pr_curve(self, hadm_ids, logits, y):
-
-        precision, recall, _ = self.test_pr_curve(hadm_ids, logits, y)
+        precision, recall, _ = self.test_pr_curve(hadm_ids, preds, target)
 
         fig = plot_pr_curve(precision, recall)
 
+        metrics = self.test_metrics(preds, target.int())
+
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
-        self.log("Precision/test", precision[0])
+        self.log("AVG-Precision/test", metrics["AveragePrecision"])
 
-        self.log("Recall/test", recall[0])
+        self.log("Precision/test", metrics["Precision"])
+
+        self.log("Recall/test", metrics["Recall"])
 
         self.logger.experiment.add_figure("PR Curve/test", fig, self.current_epoch)
+
+        self.log_confusion_matrix(preds, target)
 
     def log_confusion_matrix(self, preds, y):
 
@@ -373,7 +391,7 @@ def main(args):
         callbacks.append(LearningRateMonitor(logging_interval="step"))
 
     # Setup early stopping
-    callbacks.append(EarlyStopping('Loss/valid', stopping_threshold=0.65))
+    callbacks.append(EarlyStopping("Loss/valid", stopping_threshold=0.65))
 
     logger = TensorBoardLogger(
         args.logdir, name="ClinicalBERT", default_hp_metric=False
