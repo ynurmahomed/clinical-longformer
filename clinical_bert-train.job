@@ -5,7 +5,7 @@
 #SBATCH --job-name="bert-train"
 #SBATCH --mail-user=nrmyas001@cs.uct.ac.za
 #SBATCH --mail-type=ALL
-#SBATCH --time=00:40:00
+#SBATCH --time=01:30:00
 
 module load software/TensorFlow-A100-GPU
 
@@ -21,9 +21,9 @@ python -m src.clinical_longformer.model.bert  \
     --max_epochs=3 \
     --val_check_interval=50 \
     --batch_size=16 \
-    --lr=2e-5 \
+    --lr=7e-5 \
     --lr_scheduler_type=linear \
-    --warmup_proportion=0.1 \
+    --warmup_proportion=0.2 \
     --attention_probs_dropout_prob=0.1 \
     --hidden_dropout_prob=0.1 \
     --num_workers=6 \

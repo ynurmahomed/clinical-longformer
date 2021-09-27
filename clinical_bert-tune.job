@@ -1,11 +1,11 @@
 #!/bin/sh
 #SBATCH --account=nlpgroup --partition=a100
 #SBATCH --nodes=1 --ntasks=6
-#SBATCH --gres=gpu:ampere:1
+#SBATCH --gres=gpu:a100-3g-20gb:1
 #SBATCH --job-name="clinical_bert-tune"
 #SBATCH --mail-user=nrmyas001@cs.uct.ac.za
 #SBATCH --mail-type=ALL
-#SBATCH --time=08:00:00
+#SBATCH --time=48:00:00
 
 module load software/TensorFlow-A100-GPU
 
@@ -17,7 +17,7 @@ python -m src.clinical_longformer.tune.bert  \
     --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12/512/ \
     --local_dir=/scratch/nrmyas001/ray_results \
     --checkpoint_callback=False \
-    --num_samples=80 \
+    --num_samples=480 \
     --max_epochs=3 \
     --num_workers=6 \
     --precision=16 \
