@@ -44,7 +44,7 @@ def train_tune(config, args):
     )
 
     tune_callback = TuneReportCallback(
-        {"loss": "Loss/valid", "AUC-PR": "AUC-PR/valid"}, on="validation_end"
+        {"loss": "Loss/valid", "AUC-PR": "AUC-PR/valid", "AVG-Precision": "AVG-Precision/valid"}, on="validation_end"
     )
 
     trainer = pl.Trainer(
@@ -79,7 +79,7 @@ def tune_clinical_bert(args):
             "attention_probs_dropout_prob",
             "hidden_dropout_prob",
         ],
-        metric_columns=["loss", "AUC-PR", "training_iteration"],
+        metric_columns=["loss", "AUC-PR", "AVG-Precision", "training_iteration"],
     )
 
     trainable = tune.with_parameters(
@@ -90,7 +90,7 @@ def tune_clinical_bert(args):
     tune.run(
         trainable,
         resources_per_trial={"cpu": 1, "gpu": args.gpus},
-        metric="AUC-PR",
+        metric="AVG-Precision",
         mode="max",
         config=config,
         num_samples=args.num_samples,
