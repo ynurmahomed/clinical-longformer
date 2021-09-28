@@ -1,0 +1,23 @@
+#!/bin/sh
+#SBATCH --account=nlpgroup --partition=a100
+#SBATCH --nodes=1 --ntasks=6
+#SBATCH --gres=gpu:a100-1g-5gb:1
+#SBATCH --job-name="dan-train"
+#SBATCH --mail-user=nrmyas001@cs.uct.ac.za
+#SBATCH --mail-type=ALL
+#SBATCH --time=00:15:00
+
+module load software/TensorFlow-A100-GPU
+
+export CUDA_VISIBLE_DEVICES=$(ncvd)
+
+for i in {1..5}
+do
+python -m src.clinical_longformer.model.dan  \
+    /scratch/nrmyas001/datasets/discharge/-1 \
+    --vectors_root=/scratch/nrmyas001/data \
+    --max_epochs=10 \
+    --val_check_interval=50 \
+    --num_workers=6 \
+    --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/dan-train/$(hostname)$(openssl rand -hex 4).out
+done
