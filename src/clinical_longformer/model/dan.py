@@ -5,12 +5,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics
+import wandb
 
 from argparse import ArgumentParser
 from pathlib import Path
 from torchmetrics.functional import auc
 from torchtext.vocab import GloVe
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import WandbLogger
 
 from ..data.module import MIMICIIIDataModule, YelpReviewPolarityDataModule
 from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
@@ -114,7 +115,7 @@ class DAN(pl.LightningModule):
         return sigmoid
 
     def on_train_start(self):
-        self.logger.log_hyperparams(self.hparams, {"AUC-PR/valid": 0})
+        self.logger.log_hyperparams(self.hparams)
 
     def training_step(self, batch, batch_idx):
 
@@ -186,7 +187,9 @@ class DAN(pl.LightningModule):
 
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
-        self.logger.experiment.add_figure("PR Curve/test", fig, self.current_epoch)
+        self.logger.experiment.log(
+            {"PR Curve/test": wandb.Image(fig), "global_step": self.global_step}
+        )
 
     def log_confusion_matrix(self, preds, y):
 
@@ -194,8 +197,8 @@ class DAN(pl.LightningModule):
 
         fig = plot_confusion_matrix(cm, self.labels, self.labels)
 
-        self.logger.experiment.add_figure(
-            "Confusion Matrix/test", fig, self.current_epoch
+        self.logger.experiment.log(
+            {"Confusion Matrix/test": wandb.Image(fig), "global_step": self.global_step}
         )
 
     def configure_optimizers(self):
@@ -278,9 +281,7 @@ def main(args):
 
     model = DAN(vectors, dm.vocab, dm.labels, DAN.get_model_hparams(args))
 
-    logger = TensorBoardLogger(
-        args.logdir, name="DAN", default_hp_metric=False, log_graph=True
-    )
+    logger = WandbLogger(project="clinical-longformer", name="DAN", entity="yass")
 
     trainer = pl.Trainer.from_argparse_args(args, logger=logger)
 

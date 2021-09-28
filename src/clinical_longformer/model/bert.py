@@ -6,10 +6,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics
+import wandb
 
 from argparse import ArgumentParser
 from pathlib import Path
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping
 from transformers import (
     AdamW,
@@ -172,9 +173,7 @@ class BertPretrainedModule(pl.LightningModule):
         return output.logits
 
     def on_train_start(self):
-        self.logger.log_hyperparams(
-            self.hparams, {"AUC-PR/train": 0, "AUC-PR/valid": 0, "AUC-PR/test": 0}
-        )
+        self.logger.log_hyperparams(self.hparams)
 
     def training_step(self, batch, batch_idx):
 
@@ -271,7 +270,9 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.log("Recall/test", metrics["Recall"])
 
-        self.logger.experiment.add_figure("PR Curve/test", fig, self.current_epoch)
+        self.logger.experiment.log(
+            {"PR Curve/test": wandb.Image(fig), "global_step": self.global_step}
+        )
 
         self.log_confusion_matrix(preds, target)
 
@@ -281,8 +282,8 @@ class BertPretrainedModule(pl.LightningModule):
 
         fig = plot_confusion_matrix(cm, self.labels, self.labels)
 
-        self.logger.experiment.add_figure(
-            "Confusion Matrix/test", fig, self.current_epoch
+        self.logger.experiment.log(
+            {"Confusion Matrix/test": wandb.Image(fig), "global_step": self.global_step}
         )
 
     def configure_optimizers(self):
@@ -336,10 +337,11 @@ def add_arguments():
     )
 
     parser.add_argument(
-        "--logdir",
-        help="Where to store pytorch lightning logs",
+        "--model_type",
+        help="The transformer model type.",
         type=str,
-        default="lightning_logs",
+        default="BERT",
+        choices=["BERT", "Longformer-1024", "Longformer-2048", "Longformer-4096"]
     )
 
     parser = BertPretrainedModule.add_model_specific_args(parser)
@@ -391,11 +393,9 @@ def main(args):
         callbacks.append(LearningRateMonitor(logging_interval="step"))
 
     # Setup early stopping
-    callbacks.append(EarlyStopping("Loss/valid", stopping_threshold=0.65))
+    # callbacks.append(EarlyStopping("Loss/valid", stopping_threshold=0.65))
 
-    logger = TensorBoardLogger(
-        args.logdir, name="ClinicalBERT", default_hp_metric=False
-    )
+    logger = WandbLogger(project="clinical-longformer", name=args.model_type, entity="yass")
 
     trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=callbacks)
 
