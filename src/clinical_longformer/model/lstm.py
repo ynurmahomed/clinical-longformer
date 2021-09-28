@@ -57,9 +57,7 @@ class LSTMClassifier(pl.LightningModule):
             nn.Linear(50, 1),
         )
 
-        self.sigmoid = nn.Sigmoid()
-
-        self.bce_loss = F.binary_cross_entropy
+        self.bce_loss = nn.BCEWithLogitsLoss()
 
         # Metrics
         pr_curve = torchmetrics.PrecisionRecallCurve()
@@ -105,9 +103,7 @@ class LSTMClassifier(pl.LightningModule):
 
         linear = self.linear(transpose)
 
-        sigmoid = self.sigmoid(linear)
-
-        return sigmoid
+        return linear
 
     def on_train_start(self):
         self.logger.log_hyperparams(self.hparams)
@@ -180,7 +176,7 @@ class LSTMClassifier(pl.LightningModule):
 
         precision, recall, _ = self.test_pr_curve(preds, y)
 
-        fig = plot_pr_curve(precision, recall)
+        fig = plot_pr_curve(precision.cpu(), recall.cpu())
 
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
@@ -192,7 +188,7 @@ class LSTMClassifier(pl.LightningModule):
 
         cm = self.confmat(preds, y.int())
 
-        fig = plot_confusion_matrix(cm, self.labels, self.labels)
+        fig = plot_confusion_matrix(cm.cpu(), self.labels, self.labels)
 
         self.logger.experiment.log(
             {"Confusion Matrix/test": wandb.Image(fig), "global_step": self.global_step}
