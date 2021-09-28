@@ -183,7 +183,7 @@ class DAN(pl.LightningModule):
 
         precision, recall, _ = self.test_pr_curve(preds, y)
 
-        fig = plot_pr_curve(precision, recall)
+        fig = plot_pr_curve(precision.cpu(), recall.cpu())
 
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
@@ -195,7 +195,7 @@ class DAN(pl.LightningModule):
 
         cm = self.confmat(preds, y.int())
 
-        fig = plot_confusion_matrix(cm, self.labels, self.labels)
+        fig = plot_confusion_matrix(cm.cpu(), self.labels, self.labels)
 
         self.logger.experiment.log(
             {"Confusion Matrix/test": wandb.Image(fig), "global_step": self.global_step}
