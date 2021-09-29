@@ -1,0 +1,25 @@
+#!/bin/sh
+#SBATCH --account=nlpgroup --partition=a100
+#SBATCH --nodes=1 --ntasks=6
+#SBATCH --gres=gpu:ampere:1
+#SBATCH --job-name="clinical_longf-tune"
+#SBATCH --mail-user=nrmyas001@cs.uct.ac.za
+#SBATCH --mail-type=ALL
+#SBATCH --time=02:00:00
+
+module load software/TensorFlow-A100-GPU
+
+export CUDA_VISIBLE_DEVICES=$(ncvd)
+export TOKENIZERS_PARALLELISM=false
+export SEQ_LENGTH=1024
+
+python -m src.clinical_longformer.tune.bert  \
+    /scratch/nrmyas001/datasets/discharge/$SEQ_LENGTH \
+    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12-$SEQ_LENGTH/ \
+    --local_dir=/scratch/nrmyas001/ray_results \
+    --max_length=$SEQ_LENGTH \
+    --num_samples=10 \
+    --max_epochs=3 \
+    --num_workers=6 \
+    --gpus=1 > /scratch/nrmyas001/logs/clinical_bert-tune/$(hostname)$(openssl rand -hex 4).out
+

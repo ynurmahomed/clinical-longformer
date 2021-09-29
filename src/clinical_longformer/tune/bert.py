@@ -76,6 +76,8 @@ def tune_clinical_bert(args):
             "batch_size",
             "lr_scheduler_type",
             "warmup_proportion",
+            "attention_probs_dropout_prob",
+            "hidden_dropout_prob",
         ],
         metric_columns=["loss", "AUC-PR", "AVG-Precision", "training_iteration"],
     )
@@ -126,6 +128,8 @@ def main(args):
 
 
 def run():
+    # https://github.com/ray-project/ray/issues/10995
+    os.environ["SLURM_JOB_NAME"] = "bash"
     # https://github.com/pytorch/pytorch/issues/11201
     torch.multiprocessing.set_sharing_strategy("file_system")
     main(sys.argv[1:])

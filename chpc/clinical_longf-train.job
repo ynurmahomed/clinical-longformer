@@ -1,24 +1,36 @@
-#PBS -l select=1:ncpus=10:ngpus=1
-#PBS -P CSCI1335
-#PBS -q gpu_1
-#PBS -o /mnt/lustre/users/ynurmahomed/logs/clinical_longf-train/
-#PBS -e /mnt/lustre/users/ynurmahomed/logs/clinical_longf-train/
-#PBS -l walltime=00:30:00
-#PBS -WMail_Users=nrmyas001@myuct.ac.za
+#!/bin/sh
+#SBATCH --account=nlpgroup --partition=a100
+#SBATCH --nodes=1 --ntasks=6
+#SBATCH --gres=gpu:ampere:1
+#SBATCH --job-name="longf-train"
+#SBATCH --mail-user=nrmyas001@cs.uct.ac.za
+#SBATCH --mail-type=ALL
+#SBATCH --time=01:30:00
 
-module load chpc/python/3.7.0
-cd /mnt/lustre/users/ynurmahomed/clinical-longformer
-source .venv/bin/activate
+module load software/TensorFlow-A100-GPU
 
-export TOKENIZERS_PARALLELISM=False
-export SEQ_LEN=2048
+export CUDA_VISIBLE_DEVICES=$(ncvd)
+export TOKENIZERS_PARALLELISM=false
+export SEQ_LEN=1024
 
-ipython -m src.clinical_longformer.model.bert -- \
-    /mnt/lustre/users/ynurmahomed/datasets/discharge/$SEQ_LEN \
-    --bert_pretrained_path=/mnt/lustre/users/ynurmahomed/.data/pretraining_output/bert_uncased_L-12_H-768_A-12-$SEQ_LEN/$SEQ_LEN \
-    --logdir=/mnt/lustre/users/ynurmahomed/lightning_logs \
+
+for i in {1..5}
+do
+python -m src.clinical_longformer.model.bert \
+    /scratch/nrmyas001/datasets/discharge/$SEQ_LEN \
+    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12-$SEQ_LEN/$SEQ_LEN \
+    --model_type=Longformer-$SEQ_LEN \
+    --max_length=$SEQ_LEN \
+    --checkpoint_callback=False \
+    --val_check_interval=50 \
     --batch_size=16 \
-    --lr=5e-5 \
+    --lr=2e-5 \
+    --lr_scheduler_type=linear \
+    --warmup_proportion=0.2 \
+    --attention_probs_dropout_prob=0.$i \
+    --hidden_dropout_prob=0.$i \
     --max_epochs=3 \
     --num_workers=6 \
-    --gpus=1
+    --precision=16 \
+    --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/longf-train/$(hostname)$(openssl rand -hex 4).out
+done
