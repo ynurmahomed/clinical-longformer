@@ -70,8 +70,6 @@ class BertPretrainedModule(pl.LightningModule):
             nn.Linear(768, self.bert_pretrained_model.config.num_labels),
         )
 
-        self.sigmoid = nn.Sigmoid()
-
         self.bce_loss = nn.BCEWithLogitsLoss()
 
         # Metrics
