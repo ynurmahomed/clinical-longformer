@@ -5,7 +5,7 @@
 #SBATCH --job-name="longf-train"
 #SBATCH --mail-user=nrmyas001@cs.uct.ac.za
 #SBATCH --mail-type=ALL
-#SBATCH --time=01:00:00
+#SBATCH --time=01:30:00
 
 module load software/TensorFlow-A100-GPU
 
@@ -19,15 +19,16 @@ do
 python -m src.clinical_longformer.model.bert \
     /scratch/nrmyas001/datasets/discharge/$SEQ_LEN \
     --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12-$SEQ_LEN/$SEQ_LEN \
+    --model_type=Longformer-$SEQ_LEN \
     --max_length=$SEQ_LEN \
-    --logdir=/scratch/nrmyas001/lightning_logs \
+    --checkpoint_callback=False \
     --val_check_interval=50 \
     --batch_size=16 \
     --lr=2e-5 \
     --lr_scheduler_type=linear \
-    --warmup_proportion=0.1 \
-    --attention_probs_dropout_prob=0.1 \
-    --hidden_dropout_prob=0.1 \
+    --warmup_proportion=0.2 \
+    --attention_probs_dropout_prob=0.$i \
+    --hidden_dropout_prob=0.$i \
     --max_epochs=3 \
     --num_workers=6 \
     --precision=16 \

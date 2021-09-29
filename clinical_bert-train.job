@@ -16,9 +16,10 @@ for i in {1..5}
 do
 python -m src.clinical_longformer.model.bert  \
     /scratch/nrmyas001/datasets/discharge/512 \
+    --model_type=BERT \
     --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12/512/checkpoint-100000 \
-    --logdir=/scratch/nrmyas001/lightning_logs \
-    --max_epochs=3 \
+    --checkpoint_callback=False \
+    --max_epochs=4 \
     --val_check_interval=50 \
     --batch_size=16 \
     --lr=7e-5 \
