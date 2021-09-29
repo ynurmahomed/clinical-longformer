@@ -1,33 +1,23 @@
-#!/bin/sh
-#SBATCH --account=nlpgroup --partition=a100
-#SBATCH --nodes=1 --ntasks=6
-#SBATCH --gres=gpu:ampere:1
-#SBATCH --job-name="bert-train"
-#SBATCH --mail-user=nrmyas001@cs.uct.ac.za
-#SBATCH --mail-type=ALL
-#SBATCH --time=01:30:00
+#PBS -l select=1:ncpus=10:ngpus=1
+#PBS -P CSCI1335
+#PBS -q gpu_1
+#PBS -o /mnt/lustre/users/ynurmahomed/logs/clinical_bert-train-bert/
+#PBS -e /mnt/lustre/users/ynurmahomed/logs/clinical_bert-train-bert/
+#PBS -l walltime=00:30:00
+#PBS -WMail_Users=nrmyas001@myuct.ac.za
 
-module load software/TensorFlow-A100-GPU
+module load chpc/python/3.7.0
+cd /mnt/lustre/users/ynurmahomed/clinical-longformer
+source .venv/bin/activate
 
-export CUDA_VISIBLE_DEVICES=$(ncvd)
 export TOKENIZERS_PARALLELISM=false
 
-for i in {1..5}
-do
-python -m src.clinical_longformer.model.bert  \
-    /scratch/nrmyas001/datasets/discharge/512 \
-    --model_type=BERT \
-    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12/512/checkpoint-100000 \
-    --checkpoint_callback=False \
-    --max_epochs=4 \
-    --val_check_interval=50 \
+ipython -m src.clinical_longformer.model.bert -- \
+    /mnt/lustre/users/ynurmahomed/datasets/discharge/512 \
+    --bert_pretrained_path=/mnt/lustre/users/ynurmahomed/.data/pretraining_output/bert_uncased_L-12_H-768_A-12/512 \
+    --logdir=/mnt/lustre/users/ynurmahomed/lightning_logs \
     --batch_size=16 \
-    --lr=7e-5 \
-    --lr_scheduler_type=linear \
-    --warmup_proportion=0.2 \
-    --attention_probs_dropout_prob=0.1 \
-    --hidden_dropout_prob=0.1 \
+    --lr=3e-5 \
+    --max_epochs=3 \
     --num_workers=6 \
-    --precision=16 \
-    --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/bert-train/$(hostname)$(openssl rand -hex 4).out
-done
+    --gpus=1
