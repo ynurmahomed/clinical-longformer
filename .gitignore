@@ -64,3 +64,5 @@ lightning_logs
 
 # Ray tune
 ray_results
+
+wandb
