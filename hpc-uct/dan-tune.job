@@ -1,0 +1,16 @@
+#!/bin/sh
+#SBATCH --account=nlpgroup --partition=a100
+#SBATCH --nodes=1 --ntasks=6
+#SBATCH --gres=gpu:a100-1g-5gb:1
+#SBATCH --job-name="dan-tune"
+#SBATCH --mail-user=nrmyas001@cs.uct.ac.za
+#SBATCH --mail-type=ALL
+#SBATCH --time=24:00:00
+
+module load software/TensorFlow-A100-GPU
+
+export CUDA_VISIBLE_DEVICES=$(ncvd)
+
+cd /home/nrmyas001/clinical-longformer
+
+python3 /home/nrmyas001/.local/bin/wandb agent yass/clinical-longformer/l87zons7 2>&1 | tee /scratch/nrmyas001/logs/dan-tune/$(hostname)$(openssl rand -hex 4).out 
