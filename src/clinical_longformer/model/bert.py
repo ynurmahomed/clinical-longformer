@@ -148,6 +148,7 @@ class BertPretrainedModule(pl.LightningModule):
                 "warmup_proportion",
                 "attention_probs_dropout_prob",
                 "hidden_dropout_prob",
+                "accumulate_grad_batches"
             }
         }
 
