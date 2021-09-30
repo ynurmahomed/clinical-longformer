@@ -9,8 +9,14 @@ import wandb
 
 from argparse import ArgumentParser
 from pathlib import Path
-from torchtext.vocab import GloVe
 from pytorch_lightning.loggers import WandbLogger
+from torchtext.vocab import GloVe
+from torchmetrics import (
+    AveragePrecision,
+    ConfusionMatrix,
+    MetricCollection,
+    PrecisionRecallCurve,
+)
 
 from ..data.module import MIMICIIIDataModule
 from .utils import auc_pr, plot_confusion_matrix, plot_pr_curve
@@ -60,11 +66,11 @@ class LSTMClassifier(pl.LightningModule):
         self.bce_loss = nn.BCEWithLogitsLoss()
 
         # Metrics
-        pr_curve = torchmetrics.PrecisionRecallCurve()
+        metrics = MetricCollection([AveragePrecision(), PrecisionRecallCurve()])
 
-        self.train_pr_curve = pr_curve.clone()
-        self.valid_pr_curve = pr_curve.clone()
-        self.test_pr_curve = pr_curve.clone()
+        self.train_metrics = metrics.clone()
+        self.valid_metrics = metrics.clone()
+        self.test_metrics = metrics.clone()
 
         self.confmat = torchmetrics.ConfusionMatrix(2, normalize="true")
 
@@ -126,7 +132,9 @@ class LSTMClassifier(pl.LightningModule):
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        precision, recall, _ = self.train_pr_curve(preds, target)
+        metrics = self.train_metrics(preds, target)
+
+        precision, recall, _ = metrics["PrecisionRecallCurve"]
 
         self.log("AUC-PR/train", auc_pr(precision, recall))
 
@@ -148,9 +156,13 @@ class LSTMClassifier(pl.LightningModule):
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        precision, recall, _ = self.valid_pr_curve(preds, target)
+        metrics = self.valid_metrics(preds, target)
+
+        precision, recall, _ = metrics["PrecisionRecallCurve"]
 
         self.log("AUC-PR/valid", auc_pr(precision, recall))
+
+        self.log("AVG-Precision/valid", metrics["AveragePrecision"])
 
     def test_step(self, batch, batch_idx):
 
@@ -164,29 +176,33 @@ class LSTMClassifier(pl.LightningModule):
 
     def test_epoch_end(self, outputs):
 
-        y = torch.cat([o["target"] for o in outputs])
+        target = torch.cat([o["target"] for o in outputs])
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        self.log_pr_curve(preds, y)
+        self.log_test_metrics(preds, target)
 
-        self.log_confusion_matrix(preds, y)
+    def log_test_metrics(self, preds, target):
 
-    def log_pr_curve(self, preds, y):
+        metrics = self.test_metrics(preds, target)
 
-        precision, recall, _ = self.test_pr_curve(preds, y)
+        precision, recall, _ = metrics["PrecisionRecallCurve"]
 
         fig = plot_pr_curve(precision.cpu(), recall.cpu())
 
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
+        self.log("AVG-Precision/test", metrics["AveragePrecision"])
+
         self.logger.experiment.log(
             {"PR Curve/test": wandb.Image(fig), "global_step": self.global_step}
         )
 
-    def log_confusion_matrix(self, preds, y):
+        self.log_confusion_matrix(preds, target)
 
-        cm = self.confmat(preds, y.int())
+    def log_confusion_matrix(self, preds, target):
+
+        cm = self.confmat(preds, target.int())
 
         fig = plot_confusion_matrix(cm.cpu(), self.labels, self.labels)
 
