@@ -178,9 +178,9 @@ class BertPretrainedModule(pl.LightningModule):
 
         hadm_id, y, x = batch
 
-        preds = self(y, x)
+        preds = self(y, x).reshape(y.shape)
 
-        loss = self.bce_loss(preds.reshape(y.shape), y)
+        loss = self.bce_loss(preds, y)
 
         self.log("Loss/train", loss)
 
