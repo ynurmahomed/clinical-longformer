@@ -27,7 +27,7 @@ from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
 _logger = logging.getLogger(__name__)
 
-MAX_LENGTH = 512
+MAX_LENGTH = 1024
 BERT_PRETRAINED_PATH = ".data/model/pretraining"
 
 # Default hyperparameters
@@ -96,6 +96,13 @@ class BertPretrainedModule(pl.LightningModule):
             help="Path containing ClinicalBERT pre-trained model",
             type=str,
             default=BERT_PRETRAINED_PATH,
+        )
+        parser.add_argument(
+            "--max_length",
+            help="Max input length",
+            type=int,
+            default=MAX_LENGTH,
+            choices=[1024, 2048, 4096]
         )
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
         parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
@@ -301,12 +308,12 @@ class BertPretrainedModule(pl.LightningModule):
 
 
 def get_data_module(
-    mimic_path, bert_pretrained_path, batch_size, num_workers
+    mimic_path, bert_pretrained_path, batch_size, max_length, num_workers
 ):
     p = Path(mimic_path)
     tokenizer = AutoTokenizer.from_pretrained(bert_pretrained_path)
     dm = TransformerMIMICIIIDataModule(
-        p, batch_size, tokenizer, MAX_LENGTH, num_workers
+        p, batch_size, tokenizer, max_length, num_workers
     )
     dm.setup()
     return dm
@@ -366,6 +373,7 @@ def main(args):
         args.mimic_path,
         args.bert_pretrained_path,
         args.batch_size,
+        args.max_length,
         args.num_workers,
     )
 
@@ -385,7 +393,8 @@ def main(args):
     # Setup early stopping
     # callbacks.append(EarlyStopping("Loss/valid", stopping_threshold=0.65))
 
-    logger = WandbLogger(project="clinical-longformer", name="BERT", entity="yass")
+    name = "Longformer-" + str(args.max_length)
+    logger = WandbLogger(project="clinical-longformer", name=name, entity="yass")
 
     trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=callbacks)
 

@@ -28,7 +28,6 @@ def train_tune(config, args):
         args.mimic_path,
         args.bert_pretrained_path,
         config["batch_size"],
-        args.max_length,
         args.num_workers,
     )
 
