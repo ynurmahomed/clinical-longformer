@@ -19,10 +19,9 @@ for s in  2048
 do
   for i in {1..5}
   do
-  python -m src.clinical_longformer.model.bert \
+  python -m src.clinical_longformer.model.longformer \
       /scratch/nrmyas001/datasets/discharge/$s \
       --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12-$s/$s \
-      --model_type=Longformer-$s \
       --max_length=$s \
       --checkpoint_callback=False \
       --batch_size=2 \
