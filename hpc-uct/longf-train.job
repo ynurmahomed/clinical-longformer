@@ -1,0 +1,36 @@
+#!/bin/sh
+#SBATCH --account=nlpgroup --partition=a100
+#SBATCH --nodes=1 --ntasks=6
+#SBATCH --gres=gpu:a100-4g-20gb:1
+#SBATCH --job-name="longf-train"
+#SBATCH --mail-user=nrmyas001@cs.uct.ac.za
+#SBATCH --mail-type=ALL
+#SBATCH --time=03:00:00
+
+module load software/TensorFlow-A100-GPU
+
+export CUDA_VISIBLE_DEVICES=$(ncvd)
+export TOKENIZERS_PARALLELISM=false
+export WANDB_DIR=/scratch/nrmyas001
+
+cd /home/nrmyas001/clinical-longformer
+
+for s in  2048
+do
+  for i in {1..5}
+  do
+  python -m src.clinical_longformer.model.bert \
+      /scratch/nrmyas001/datasets/discharge/$s \
+      --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12-$s/$s \
+      --model_type=Longformer-$s \
+      --max_length=$s \
+      --checkpoint_callback=False \
+      --batch_size=2 \
+      --accumulate_grad_batches=16 \
+      --lr=3e-5 \
+      --max_epochs=3 \
+      --num_workers=6 \
+      --precision=16 \
+      --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/longf-train/$(hostname)$(openssl rand -hex 4).out
+  done
+done
