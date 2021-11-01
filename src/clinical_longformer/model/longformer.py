@@ -59,6 +59,7 @@ class BertPretrainedModule(pl.LightningModule):
         self.bert_pretrained_model = AutoModelForSequenceClassification.from_pretrained(
             bert_pretrained_path,
             num_labels=1,
+            attention_window=self.hparams.attention_window,
             attention_probs_dropout_prob=self.hparams.attention_probs_dropout_prob,
             hidden_dropout_prob=self.hparams.hidden_dropout_prob,
         )
@@ -155,7 +156,8 @@ class BertPretrainedModule(pl.LightningModule):
                 "warmup_proportion",
                 "attention_probs_dropout_prob",
                 "hidden_dropout_prob",
-                "accumulate_grad_batches"
+                "accumulate_grad_batches",
+                "attention_window"
             }
         }
 
