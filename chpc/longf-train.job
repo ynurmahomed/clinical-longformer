@@ -1,0 +1,34 @@
+#PBS -l select=1:ncpus=10:ngpus=1:host=gpu2005
+#PBS -P CSCI1335
+#PBS -q gpu_1
+#PBS -o /mnt/lustre/users/ynurmahomed/logs/longf-train/
+#PBS -e /mnt/lustre/users/ynurmahomed/logs/longf-train/
+#PBS -l walltime=06:00:00
+#PBS -WMail_Users=nrmyas001@myuct.ac.za
+
+module load chpc/python/3.7.0
+cd /mnt/lustre/users/ynurmahomed/clinical-longformer
+source .venv/bin/activate
+
+export TOKENIZERS_PARALLELISM=False
+export WANDB_DIR=/mnt/lustre/users/ynurmahomed
+
+for s in 1024
+do
+  for e in 4 5 6 
+  do
+    ipython -m src.clinical_longformer.tune.longformer -- \
+        /mnt/lustre/users/ynurmahomed/datasets/discharge/$s \
+        --bert_pretrained_path=/mnt/lustre/users/ynurmahomed/.data/pretraining_output/bert_uncased_L-12_H-768_A-12-$s/$s \
+        --attention_window=512 \
+        --checkpoint_callback=False \
+        --batch_size=4 \
+        --accumulate_grad_batches=10 \
+        --lr=3e-5 \
+        --max_epochs=$e \
+        --num_workers=6 \
+        --precision=16 \
+	--max_length=$s \
+    	--gpus=1
+  done
+done
