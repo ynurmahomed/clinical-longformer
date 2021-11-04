@@ -10,6 +10,7 @@ import wandb
 
 from argparse import ArgumentParser
 from pathlib import Path
+from pytorch_lightning import seed_everything
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping
 from transformers import (
@@ -27,6 +28,7 @@ from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
 _logger = logging.getLogger(__name__)
 
+SEED = 42
 MAX_LENGTH = 1024
 BERT_PRETRAINED_PATH = ".data/model/pretraining"
 
@@ -103,7 +105,7 @@ class BertPretrainedModule(pl.LightningModule):
             help="Max input length",
             type=int,
             default=MAX_LENGTH,
-            choices=[1024, 2048, 4096]
+            choices=[1024, 2048, 4096],
         )
         parser.add_argument("--lr", type=float, default=LEARNING_RATE)
         parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
@@ -157,7 +159,7 @@ class BertPretrainedModule(pl.LightningModule):
                 "attention_probs_dropout_prob",
                 "hidden_dropout_prob",
                 "accumulate_grad_batches",
-                "attention_window"
+                "attention_window",
             }
         }
 
@@ -410,6 +412,7 @@ def main(args):
 def run():
     # https://github.com/pytorch/pytorch/issues/11201
     torch.multiprocessing.set_sharing_strategy("file_system")
+    seed_everything(SEED, workers=True)
     main(sys.argv[1:])
 
 
