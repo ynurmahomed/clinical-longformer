@@ -9,11 +9,11 @@ import wandb
 
 from argparse import ArgumentParser
 from pathlib import Path
+from pytorch_lightning import seed_everything
 from pytorch_lightning.loggers import WandbLogger
 from torchtext.vocab import GloVe
 from torchmetrics import (
     AveragePrecision,
-    ConfusionMatrix,
     MetricCollection,
     PrecisionRecallCurve,
 )
@@ -22,6 +22,7 @@ from ..data.module import MIMICIIIDataModule
 from .utils import auc_pr, plot_confusion_matrix, plot_pr_curve
 
 
+SEED = 42
 # Default hyperparameters
 LEARNING_RATE = 1e-3
 HIDDEN_DIM = 200
@@ -264,6 +265,13 @@ def add_arguments():
         default=".data",
     )
 
+    parser.add_argument(
+        "--random_seed",
+        help="The integer value seed for global random state.",
+        type=str,
+        default=SEED,
+    )
+
     parser = LSTMClassifier.add_model_specific_args(parser)
 
     parser = pl.Trainer.add_argparse_args(parser)
@@ -288,6 +296,12 @@ def main(args):
     model = LSTMClassifier(vectors, dm.vocab, dm.labels, hparams)
 
     logger = WandbLogger(project="clinical-longformer", name="LSTM", entity="yass")
+
+    logger.watch(model)
+
+    logger.experiment.config["seed"] = args.random_seed
+
+    seed_everything(args.random_seed, workers=True)
 
     trainer = pl.Trainer.from_argparse_args(args, logger=logger)
 
