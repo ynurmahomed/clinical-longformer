@@ -4,11 +4,11 @@ import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchmetrics
 import wandb
 
 from argparse import ArgumentParser
 from pathlib import Path
+from pytorch_lightning import seed_everything
 from pytorch_lightning.loggers import WandbLogger
 from torchtext.vocab import GloVe
 from torchmetrics import (
@@ -22,6 +22,7 @@ from ..data.module import MIMICIIIDataModule, YelpReviewPolarityDataModule
 from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
 
+SEED = 42
 # Default hyperparameters
 LEARNING_RATE = 1e-2
 NUM_HIDDEN = 2
@@ -274,6 +275,13 @@ def add_arguments():
         default=".data",
     )
 
+    parser.add_argument(
+        "--random_seed",
+        help="The integer value seed for global random state.",
+        type=str,
+        default=SEED,
+    )
+
     parser = DAN.add_model_specific_args(parser)
 
     parser = pl.Trainer.add_argparse_args(parser)
@@ -297,6 +305,12 @@ def main(args):
     model = DAN(vectors, dm.vocab, dm.labels, DAN.get_model_hparams(args))
 
     logger = WandbLogger(project="clinical-longformer", name="DAN", entity="yass")
+
+    logger.watch(model)
+
+    logger.experiment.config["seed"] = args.random_seed
+
+    seed_everything(args.random_seed, workers=True)
 
     trainer = pl.Trainer.from_argparse_args(args, logger=logger)
 

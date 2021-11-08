@@ -346,6 +346,13 @@ def add_arguments():
         default=0,
     )
 
+    parser.add_argument(
+        "--random_seed",
+        help="The integer value seed for global random state.",
+        type=str,
+        default=SEED,
+    )
+
     parser = BertPretrainedModule.add_model_specific_args(parser)
 
     parser = pl.Trainer.add_argparse_args(parser)
@@ -400,6 +407,12 @@ def main(args):
     name = "Longformer-" + str(args.max_length)
     logger = WandbLogger(project="clinical-longformer", name=name, entity="yass")
 
+    logger.watch(model)
+
+    logger.experiment.config["seed"] = args.random_seed
+
+    seed_everything(args.random_seed, workers=True)
+
     trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=callbacks)
 
     set_example_input_array(dm, model)
@@ -412,7 +425,6 @@ def main(args):
 def run():
     # https://github.com/pytorch/pytorch/issues/11201
     torch.multiprocessing.set_sharing_strategy("file_system")
-    seed_everything(SEED, workers=True)
     main(sys.argv[1:])
 
 
