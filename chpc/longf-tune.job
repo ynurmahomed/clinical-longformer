@@ -1,8 +1,8 @@
-#PBS -l select=1:ncpus=10:ngpus=1
+#PBS -l select=1:ncpus=8:ngpus=1:host=gpu2005
 #PBS -P CSCI1335
 #PBS -q gpu_1
-#PBS -o /mnt/lustre/users/ynurmahomed/logs/dan-tune/
-#PBS -e /mnt/lustre/users/ynurmahomed/logs/dan-tune/
+#PBS -o /mnt/lustre/users/ynurmahomed/logs/longf-tune/
+#PBS -e /mnt/lustre/users/ynurmahomed/logs/longf-tune/
 #PBS -l walltime=12:00:00
 #PBS -WMail_Users=nrmyas001@myuct.ac.za
 
@@ -13,4 +13,4 @@ source .venv/bin/activate
 export TOKENIZERS_PARALLELISM=False
 export WANDB_DIR=/mnt/lustre/users/ynurmahomed
 
-wandb agent yass/clinical-longformer/aeqgj7xx
+wandb agent yass/clinical-longformer/0pvxqmsf
