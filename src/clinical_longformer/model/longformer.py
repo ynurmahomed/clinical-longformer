@@ -218,7 +218,7 @@ class BertPretrainedModule(pl.LightningModule):
 
         hadm_id, y, x = batch
 
-        preds = self(y, x).squeeze()
+        preds = self(y, x).reshape(y.shape)
 
         loss = self.bce_loss(preds, y)
 
@@ -250,7 +250,7 @@ class BertPretrainedModule(pl.LightningModule):
 
         hadm_id, y, x = batch
 
-        preds = self(y, x).squeeze()
+        preds = self(y, x).reshape(y.shape)
 
         return {"hadm_id": hadm_id, "preds": preds, "target": y}
 
