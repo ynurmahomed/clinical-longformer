@@ -214,7 +214,6 @@ class TransformerMIMICIIIDataModule(pl.LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
             collate_fn=self.collate_fn,
             num_workers=self.num_workers,
         )
