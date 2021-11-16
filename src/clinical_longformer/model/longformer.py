@@ -25,6 +25,7 @@ from torchmetrics import AveragePrecision, MetricCollection, Precision, Recall
 from ..data.module import TransformerMIMICIIIDataModule
 from .metrics import ClinicalBERTBinnedPRCurve
 from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
+from .modeling_bert_long import BertLongForSequenceClassification
 
 _logger = logging.getLogger(__name__)
 
@@ -57,8 +58,8 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.save_hyperparameters(hparams, ignore=["bert_pretrained_path", "labels"])
 
-        # BERT type Model
-        self.bert_pretrained_model = AutoModelForSequenceClassification.from_pretrained(
+        # BERT long
+        self.bert_pretrained_model = BertLongForSequenceClassification.from_pretrained(
             bert_pretrained_path,
             num_labels=1,
             attention_window=self.hparams.attention_window,
