@@ -29,7 +29,6 @@ from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 _logger = logging.getLogger(__name__)
 
 SEED = 42
-MAX_LENGTH = 512
 BERT_PRETRAINED_PATH = ".data/model/pretraining"
 
 # Default hyperparameters
@@ -305,9 +304,7 @@ class BertPretrainedModule(pl.LightningModule):
 def get_data_module(mimic_path, bert_pretrained_path, batch_size, num_workers):
     p = Path(mimic_path)
     tokenizer = AutoTokenizer.from_pretrained(bert_pretrained_path)
-    dm = TransformerMIMICIIIDataModule(
-        p, batch_size, tokenizer, MAX_LENGTH, num_workers
-    )
+    dm = TransformerMIMICIIIDataModule(p, batch_size, tokenizer, num_workers)
     dm.setup()
     return dm
 

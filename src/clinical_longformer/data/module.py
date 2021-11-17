@@ -147,14 +147,13 @@ class NoteEventsDataset(Dataset):
 
 
 class TransformerMIMICIIIDataModule(pl.LightningDataModule):
-    def __init__(self, path, batch_size, tokenizer, max_length, num_workers):
+    def __init__(self, path, batch_size, tokenizer, num_workers):
 
         super().__init__()
 
         self.path = path
         self.batch_size = batch_size
         self.tokenizer = tokenizer
-        self.max_length = max_length
         self.num_workers = num_workers
 
     def setup(self):
@@ -198,9 +197,7 @@ class TransformerMIMICIIIDataModule(pl.LightningDataModule):
             label_list.append(_label)
             text_list.append(_text)
 
-        encoding = self.tokenizer(
-            text_list, padding=True, truncation=True, max_length=self.max_length
-        )
+        encoding = self.tokenizer(text_list, padding='max_length', truncation=True)
 
         encoding_dict = {key: torch.tensor(val) for key, val in encoding.items()}
 
