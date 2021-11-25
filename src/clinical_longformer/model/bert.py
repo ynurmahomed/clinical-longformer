@@ -67,7 +67,9 @@ class BertPretrainedModule(pl.LightningModule):
         # 3 layer classifier like in Huang, K., Altosaar, J., & Ranganath, R. (2019).
         self.bert_pretrained_model.classifier = nn.Sequential(
             nn.Linear(self.bert_pretrained_model.config.hidden_size, 2048),
+            nn.ReLU(),
             nn.Linear(2048, 768),
+            nn.ReLU(),
             nn.Linear(768, self.bert_pretrained_model.config.num_labels),
         )
 
