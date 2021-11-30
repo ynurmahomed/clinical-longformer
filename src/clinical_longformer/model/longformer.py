@@ -358,6 +358,13 @@ def add_arguments():
         default=SEED,
     )
 
+    parser.add_argument(
+        "--run_name",
+        help="An optional descriptor for the run. Notably used for wandb logging.",
+        type=str,
+        default=None,
+    )
+
     parser = BertPretrainedModule.add_model_specific_args(parser)
 
     parser = pl.Trainer.add_argparse_args(parser)
@@ -408,7 +415,7 @@ def main(args):
     # Setup early stopping
     # callbacks.append(EarlyStopping("Loss/valid", stopping_threshold=0.65))
 
-    name = "Longformer-" + str(args.max_length)
+    name = args.run_name or "Longformer-" + str(args.max_length)
     logger = WandbLogger(project="clinical-longformer", name=name, entity="yass")
 
     logger.watch(model)
