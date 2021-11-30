@@ -4,6 +4,9 @@ import torch
 from torch import nn
 from transformers import BertModel, BertForMaskedLM, BertForSequenceClassification
 from transformers.models.longformer.modeling_longformer import LongformerSelfAttention
+from transformers.utils.dummy_pt_objects import AutoModel
+
+from .configuration_bert_long import BertLongConfig
 
 class BertLongSelfAttention(LongformerSelfAttention):
     # Copied from LongformerSelfAttention with patches from https://github.com/allenai/longformer/pull/166.
@@ -177,6 +180,7 @@ class BertLongForMaskedLM(BertForMaskedLM):
             layer.attention.self = BertLongSelfAttention(config, layer_id=i)
 
 class BertLongModel(BertModel):
+    config_class = BertLongConfig
     def __init__(self, config):
         super().__init__(config)
         for i, layer in enumerate(self.encoder.layer):

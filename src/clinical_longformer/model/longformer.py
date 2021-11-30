@@ -22,7 +22,9 @@ from transformers import (
 )
 from torchmetrics import AveragePrecision, MetricCollection, Precision, Recall
 
+
 from ..data.module import TransformerMIMICIIIDataModule
+from .configuration_bert_long import BertLongConfig
 from .metrics import ClinicalBERTBinnedPRCurve
 from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 from .modeling_bert_long import BertLongForSequenceClassification
@@ -58,13 +60,17 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.save_hyperparameters(hparams, ignore=["bert_pretrained_path", "labels"])
 
+        config = BertLongConfig.from_pretrained(bert_pretrained_path)
+        w = self.hparams.attention_window
+        config.attention_window = [w] * config.num_hidden_layers
+        config.attention_probs_dropout_prob = self.hparams.attention_probs_dropout_prob
+        config.hidden_dropout_prob = self.hparams.hidden_dropout_prob
+        config.num_labels = 1
+
         # BERT long
         self.bert_pretrained_model = BertLongForSequenceClassification.from_pretrained(
             bert_pretrained_path,
-            num_labels=1,
-            attention_window=self.hparams.attention_window,
-            attention_probs_dropout_prob=self.hparams.attention_probs_dropout_prob,
-            hidden_dropout_prob=self.hparams.hidden_dropout_prob,
+            config=config,
         )
 
         # 3 layer classifier like in Huang, K., Altosaar, J., & Ranganath, R. (2019).
