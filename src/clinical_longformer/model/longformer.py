@@ -12,7 +12,11 @@ from argparse import ArgumentParser
 from pathlib import Path
 from pytorch_lightning import seed_everything
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping
+from pytorch_lightning.callbacks import (
+    LearningRateMonitor,
+    EarlyStopping,
+    ModelCheckpoint,
+)
 from transformers import (
     AdamW,
     AutoTokenizer,
@@ -429,6 +433,15 @@ def main(args):
         )
 
         callbacks.append(early_stopping)
+
+    # Setup model checkpointing
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=args.default_root_dir,
+        monitor="Loss/valid",
+        filename="epoch={epoch}-step={step}-loss_valid={Loss/valid:.2f}",
+        auto_insert_metric_name=False,
+    )
+    callbacks.append(checkpoint_callback)
 
     name = args.run_name or "Longformer-" + str(args.max_length)
     logger = WandbLogger(project="clinical-longformer", name=name, entity="yass")
