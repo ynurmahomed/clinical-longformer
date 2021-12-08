@@ -358,6 +358,13 @@ def add_arguments():
         default=SEED,
     )
 
+    parser.add_argument(
+        "--stopping_threshold",
+        help="Stop training immediately once the validation loss reaches this threshold.",
+        type=float,
+        default=None,
+    )
+
     parser = BertPretrainedModule.add_model_specific_args(parser)
 
     parser = pl.Trainer.add_argparse_args(parser)
@@ -406,7 +413,15 @@ def main(args):
         callbacks.append(LearningRateMonitor(logging_interval="step"))
 
     # Setup early stopping
-    # callbacks.append(EarlyStopping("Loss/valid", stopping_threshold=0.65))
+    if args.stopping_threshold is not None:
+        early_stopping = EarlyStopping(
+            "Loss/valid",
+            stopping_threshold=args.stopping_threshold,
+            check_on_train_epoch_end=False,
+            verbose=True,
+        )
+
+        callbacks.append(early_stopping)
 
     name = "Longformer-" + str(args.max_length)
     logger = WandbLogger(project="clinical-longformer", name=name, entity="yass")
