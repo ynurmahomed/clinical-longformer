@@ -310,7 +310,7 @@ class BertPretrainedModule(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        optimizer = AdamW(self.parameters(), lr=self.hparams.lr)
+        optimizer = AdamW(self.parameters(), lr=self.hparams.lr, weight_decay=0.01)
 
         if self.hparams.lr_scheduler_type is not None:
             lr_scheduler = get_scheduler(
