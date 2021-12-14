@@ -12,7 +12,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from pytorch_lightning import seed_everything
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping
+from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping, ModelCheckpoint
 from transformers import (
     AdamW,
     AutoTokenizer,
@@ -341,6 +341,13 @@ def add_arguments():
         default=SEED,
     )
 
+    parser.add_argument(
+        "--stopping_threshold",
+        help="Stop training immediately once the validation loss reaches this threshold.",
+        type=float,
+        default=None,
+    )
+
     parser = BertPretrainedModule.add_model_specific_args(parser)
 
     parser = pl.Trainer.add_argparse_args(parser)
@@ -389,7 +396,24 @@ def main(args):
         callbacks.append(LearningRateMonitor(logging_interval="step"))
 
     # Setup early stopping
-    # callbacks.append(EarlyStopping("Loss/valid", stopping_threshold=0.65))
+    if args.stopping_threshold is not None:
+        early_stopping = EarlyStopping(
+            "Loss/valid",
+            stopping_threshold=args.stopping_threshold,
+            check_on_train_epoch_end=False,
+            verbose=True,
+        )
+
+        callbacks.append(early_stopping)
+
+    # Setup model checkpointing
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=args.default_root_dir,
+        monitor="Loss/valid",
+        filename="epoch={epoch}-step={step}-loss_valid={Loss/valid:.2f}",
+        auto_insert_metric_name=False,
+    )
+    callbacks.append(checkpoint_callback)
 
     logger = WandbLogger(project="clinical-longformer", name="BERT", entity="yass")
 
