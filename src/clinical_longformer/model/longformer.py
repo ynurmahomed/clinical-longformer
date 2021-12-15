@@ -364,7 +364,7 @@ def add_arguments():
 
     parser.add_argument(
         "--stopping_threshold",
-        help="Stop training immediately once the validation loss reaches this threshold.",
+        help="Stop training immediately once the validation AVG-Precision reaches this threshold.",
         type=float,
         default=None,
     )
@@ -426,10 +426,11 @@ def main(args):
     # Setup early stopping
     if args.stopping_threshold is not None:
         early_stopping = EarlyStopping(
-            "Loss/valid",
+            "AVG-Precision/valid",
             stopping_threshold=args.stopping_threshold,
             check_on_train_epoch_end=False,
             verbose=True,
+            mode="max"
         )
 
         callbacks.append(early_stopping)
@@ -437,8 +438,9 @@ def main(args):
     # Setup model checkpointing
     checkpoint_callback = ModelCheckpoint(
         dirpath=args.default_root_dir,
-        monitor="Loss/valid",
-        filename="epoch={epoch}-step={step}-loss_valid={Loss/valid:.2f}",
+        filename="epoch={epoch}-step={step}-AVG-Precision_valid={AVG-Precision/valid:.2f}",
+        monitor="AVG-Precision/valid",
+        mode="max",
         auto_insert_metric_name=False,
     )
     callbacks.append(checkpoint_callback)
