@@ -9,6 +9,7 @@ import wandb
 from argparse import ArgumentParser
 from pathlib import Path
 from pytorch_lightning import seed_everything
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torchtext.vocab import GloVe
 from torchmetrics import (
@@ -304,6 +305,17 @@ def main(args):
 
     model = DAN(vectors, dm.vocab, dm.labels, DAN.get_model_hparams(args))
 
+    callbacks = []
+    # Setup model checkpointing
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=args.default_root_dir,
+        filename="AVG-Precision_valid={AVG-Precision/valid:.2f}-epoch={epoch}-step={step}",
+        monitor="AVG-Precision/valid",
+        mode="max",
+        auto_insert_metric_name=False,
+    )
+    callbacks.append(checkpoint_callback)
+
     logger = WandbLogger(project="clinical-longformer", name="DAN", entity="yass")
 
     logger.watch(model)
@@ -312,7 +324,7 @@ def main(args):
 
     seed_everything(args.random_seed, workers=True)
 
-    trainer = pl.Trainer.from_argparse_args(args, logger=logger)
+    trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=callbacks)
 
     set_example_input_array(dm, model)
 
