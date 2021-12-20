@@ -25,12 +25,12 @@ from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
 SEED = 42
 # Default hyperparameters
-LEARNING_RATE = 1e-2
+LEARNING_RATE = 8e-4
 NUM_HIDDEN = 2
-W_DECAY = 1e-5
+W_DECAY = 1e-2
 WORD_DROPOUT = 0.7
-BATCH_SIZE = 50
-EMBED_DIM = 300
+BATCH_SIZE = 64
+EMBED_DIM = 100
 
 
 class DAN(pl.LightningModule):
