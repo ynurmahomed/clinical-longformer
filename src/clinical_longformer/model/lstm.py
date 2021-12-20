@@ -25,11 +25,11 @@ from .utils import auc_pr, plot_confusion_matrix, plot_pr_curve
 
 SEED = 42
 # Default hyperparameters
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 5e-4
 HIDDEN_DIM = 200
 BATCH_SIZE = 64
 EMBED_DIM = 300
-DROPOUT = 1e-1
+DROPOUT = 5e-1
 
 
 class LSTMClassifier(pl.LightningModule):
