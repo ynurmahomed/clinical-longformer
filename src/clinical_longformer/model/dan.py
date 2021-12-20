@@ -73,7 +73,7 @@ class DAN(pl.LightningModule):
         self.bce_loss = F.binary_cross_entropy
 
         # Metrics
-        metrics = MetricCollection([AveragePrecision(), PrecisionRecallCurve()])
+        metrics = MetricCollection([AveragePrecision(pos_label=1), PrecisionRecallCurve(pos_label=1)])
 
         self.train_metrics = metrics.clone()
         self.valid_metrics = metrics.clone()
@@ -134,7 +134,7 @@ class DAN(pl.LightningModule):
 
         self.log("Loss/train", loss)
 
-        return {"loss": loss, "preds": preds, "target": y}
+        return {"loss": loss, "preds": preds.detach(), "target": y}
 
     def training_epoch_end(self, outputs):
 
@@ -158,7 +158,7 @@ class DAN(pl.LightningModule):
 
         self.log("Loss/valid", loss)
 
-        return {"loss": loss, "preds": preds, "target": y}
+        return {"loss": loss, "preds": preds.detach(), "target": y}
 
     def validation_epoch_end(self, outputs):
 

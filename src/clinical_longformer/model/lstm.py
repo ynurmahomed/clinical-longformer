@@ -68,7 +68,7 @@ class LSTMClassifier(pl.LightningModule):
         self.bce_loss = nn.BCEWithLogitsLoss()
 
         # Metrics
-        metrics = MetricCollection([AveragePrecision(), PrecisionRecallCurve()])
+        metrics = MetricCollection([AveragePrecision(pos_label=1), PrecisionRecallCurve(pos_label=1)])
 
         self.train_metrics = metrics.clone()
         self.valid_metrics = metrics.clone()
