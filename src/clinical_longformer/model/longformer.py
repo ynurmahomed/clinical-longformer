@@ -438,7 +438,7 @@ def main(args):
     # Setup model checkpointing
     checkpoint_callback = ModelCheckpoint(
         dirpath=args.default_root_dir,
-        filename="epoch={epoch}-step={step}-AVG-Precision_valid={AVG-Precision/valid:.2f}",
+        filename="AVG-Precision_valid={AVG-Precision/valid:.2f}-epoch={epoch}-step={step}",
         monitor="AVG-Precision/valid",
         mode="max",
         auto_insert_metric_name=False,
