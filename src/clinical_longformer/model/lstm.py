@@ -15,12 +15,15 @@ from pytorch_lightning.loggers import WandbLogger
 from torchtext.vocab import GloVe
 from torchmetrics import (
     AveragePrecision,
+    AUROC,
+    ConfusionMatrix,
     MetricCollection,
     PrecisionRecallCurve,
+    ROC,
 )
 
 from ..data.module import MIMICIIIDataModule
-from .utils import auc_pr, plot_confusion_matrix, plot_pr_curve
+from .utils import auc_pr, plot_confusion_matrix, plot_pr_curve, plot_roc_curve
 
 
 SEED = 42
@@ -68,13 +71,17 @@ class LSTMClassifier(pl.LightningModule):
         self.bce_loss = nn.BCEWithLogitsLoss()
 
         # Metrics
-        metrics = MetricCollection([AveragePrecision(pos_label=1), PrecisionRecallCurve(pos_label=1)])
+        metrics = MetricCollection([PrecisionRecallCurve(pos_label=1)])
 
         self.train_metrics = metrics.clone()
-        self.valid_metrics = metrics.clone()
-        self.test_metrics = metrics.clone()
 
-        self.confmat = torchmetrics.ConfusionMatrix(2, normalize="true")
+        self.valid_metrics = metrics.clone()
+        self.valid_metrics.add_metrics([AveragePrecision(pos_label=1)])
+
+        self.test_metrics = metrics.clone()
+        self.test_metrics.add_metrics(
+            [AUROC(pos_label=1), ROC(pos_label=1), ConfusionMatrix(2, normalize="true")]
+        )
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -186,30 +193,37 @@ class LSTMClassifier(pl.LightningModule):
 
     def log_test_metrics(self, preds, target):
 
-        metrics = self.test_metrics(preds, target)
+        metrics = self.test_metrics(preds, target.int())
 
         precision, recall, _ = metrics["PrecisionRecallCurve"]
 
-        fig = plot_pr_curve(precision.cpu(), recall.cpu())
+        pr_curve = plot_pr_curve(precision.cpu(), recall.cpu())
+
+        fpr, tpr, _ = metrics["ROC"]
+
+        roc_curve = plot_roc_curve(fpr, tpr, metrics["AUROC"])
+
+        confmat = plot_confusion_matrix(
+            metrics["ConfusionMatrix"].cpu(), self.labels, self.labels
+        )
 
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
-        self.log("AVG-Precision/test", metrics["AveragePrecision"])
+        self.log("AUC-ROC/test", metrics["AUROC"])
 
         self.logger.experiment.log(
-            {"PR Curve/test": wandb.Image(fig), "global_step": self.global_step}
+            {"PR Curve/test": wandb.Image(pr_curve), "global_step": self.global_step}
         )
 
-        self.log_confusion_matrix(preds, target)
-
-    def log_confusion_matrix(self, preds, target):
-
-        cm = self.confmat(preds, target.int())
-
-        fig = plot_confusion_matrix(cm.cpu(), self.labels, self.labels)
+        self.logger.experiment.log(
+            {"ROC Curve/test": wandb.Image(roc_curve), "global_step": self.global_step}
+        )
 
         self.logger.experiment.log(
-            {"Confusion Matrix/test": wandb.Image(fig), "global_step": self.global_step}
+            {
+                "Confusion Matrix/test": wandb.Image(confmat),
+                "global_step": self.global_step,
+            }
         )
 
     def configure_optimizers(self):

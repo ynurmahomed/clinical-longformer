@@ -26,15 +26,16 @@ from transformers import (
 )
 from torchmetrics import (
     AveragePrecision,
+    AUROC,
+    ConfusionMatrix,
     MetricCollection,
-    Precision,
     PrecisionRecallCurve,
-    Recall,
+    ROC,
 )
 
 from ..data.module import TransformerMIMICIIIDataModule
 from .metrics import per_admission_predictions
-from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
+from .utils import auc_pr, plot_pr_curve, plot_roc_curve, plot_confusion_matrix
 
 _logger = logging.getLogger(__name__)
 
@@ -86,20 +87,17 @@ class BertPretrainedModule(pl.LightningModule):
         self.bce_loss = nn.BCEWithLogitsLoss()
 
         # Metrics
-        pr_curve = PrecisionRecallCurve()
-        # Using separate metric collection as inputs for the following
-        # are different
-        metrics = MetricCollection([AveragePrecision(), Precision(), Recall()])
+        metrics = MetricCollection([PrecisionRecallCurve(pos_label=1)])
 
-        self.train_pr_curve = pr_curve.clone()
+        self.train_metrics = metrics.clone()
 
-        self.valid_pr_curve = pr_curve.clone()
         self.valid_metrics = metrics.clone()
+        self.valid_metrics.add_metrics([AveragePrecision(pos_label=1)])
 
-        self.test_pr_curve = pr_curve.clone()
         self.test_metrics = metrics.clone()
-
-        self.confmat = torchmetrics.ConfusionMatrix(2, normalize="true")
+        self.test_metrics.add_metrics(
+            [AUROC(pos_label=1), ROC(pos_label=1), ConfusionMatrix(2, normalize="true")]
+        )
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -214,7 +212,9 @@ class BertPretrainedModule(pl.LightningModule):
 
         preds, target = per_admission_predictions(hadm_ids, preds, target)
 
-        precision, recall, _ = self.train_pr_curve(preds, target)
+        metrics = self.train_metrics(preds, target)
+
+        precision, recall, _ = metrics["PrecisionRecallCurve"]
 
         self.log("AUC-PR/train", auc_pr(precision, recall))
 
@@ -240,17 +240,13 @@ class BertPretrainedModule(pl.LightningModule):
 
         preds, target = per_admission_predictions(hadm_ids, preds, target)
 
-        precision, recall, _ = self.valid_pr_curve(preds, target)
+        metrics = self.valid_metrics(preds, target)
 
-        metrics = self.valid_metrics(preds, target.int())
+        precision, recall, _ = metrics["PrecisionRecallCurve"]
 
         self.log("AUC-PR/valid", auc_pr(precision, recall))
 
         self.log("AVG-Precision/valid", metrics["AveragePrecision"])
-
-        self.log("Precision/valid", metrics["Precision"])
-
-        self.log("Recall/valid", metrics["Recall"])
 
     def test_step(self, batch, batch_idx):
 
@@ -274,34 +270,37 @@ class BertPretrainedModule(pl.LightningModule):
 
         preds, target = per_admission_predictions(hadm_ids, preds, target)
 
-        precision, recall, _ = self.test_pr_curve(preds, target)
-
-        fig = plot_pr_curve(precision, recall)
-
         metrics = self.test_metrics(preds, target.int())
+
+        precision, recall, _ = metrics["PrecisionRecallCurve"]
+
+        pr_curve = plot_pr_curve(precision.cpu(), recall.cpu())
+
+        fpr, tpr, _ = metrics["ROC"]
+
+        roc_curve = plot_roc_curve(fpr, tpr, metrics["AUROC"])
+
+        confmat = plot_confusion_matrix(
+            metrics["ConfusionMatrix"].cpu(), self.labels, self.labels
+        )
 
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
-        self.log("AVG-Precision/test", metrics["AveragePrecision"])
-
-        self.log("Precision/test", metrics["Precision"])
-
-        self.log("Recall/test", metrics["Recall"])
+        self.log("AUC-ROC/test", metrics["AUROC"])
 
         self.logger.experiment.log(
-            {"PR Curve/test": wandb.Image(fig), "global_step": self.global_step}
+            {"PR Curve/test": wandb.Image(pr_curve), "global_step": self.global_step}
         )
 
-        self.log_confusion_matrix(preds, target)
-
-    def log_confusion_matrix(self, preds, y):
-
-        cm = self.confmat(preds, y.int())
-
-        fig = plot_confusion_matrix(cm, self.labels, self.labels)
+        self.logger.experiment.log(
+            {"ROC Curve/test": wandb.Image(roc_curve), "global_step": self.global_step}
+        )
 
         self.logger.experiment.log(
-            {"Confusion Matrix/test": wandb.Image(fig), "global_step": self.global_step}
+            {
+                "Confusion Matrix/test": wandb.Image(confmat),
+                "global_step": self.global_step,
+            }
         )
 
     def configure_optimizers(self):
@@ -418,7 +417,7 @@ def main(args):
             stopping_threshold=args.stopping_threshold,
             check_on_train_epoch_end=False,
             verbose=True,
-            mode="max"
+            mode="max",
         )
 
         callbacks.append(early_stopping)

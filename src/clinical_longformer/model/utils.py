@@ -5,7 +5,7 @@ import torch
 
 from torchmetrics.functional import auc
 from matplotlib.axes import Axes
-from sklearn.metrics import PrecisionRecallDisplay
+from sklearn.metrics import PrecisionRecallDisplay, RocCurveDisplay
 
 
 def macro_auc_pr(precision: torch.Tensor, recall: torch.Tensor) -> torch.Tensor:
@@ -34,6 +34,23 @@ def plot_pr_curve(precision, recall):
 
     return fig
 
+def plot_roc_curve(fpr, tpr, roc_auc):
+
+    plt.figure(figsize=(10, 7))
+
+    disp = RocCurveDisplay(fpr=fpr, tpr=tpr)
+
+    disp.plot()
+
+    disp.ax_.legend([f"ROC AUC {roc_auc:.2f}"])
+
+    plt.xlim(-0.05, 1.05)
+    plt.ylim(-0.05, 1.05)
+
+    fig = disp.figure_
+    plt.close(fig)
+
+    return fig
 
 def plot_confusion_matrix(confmat: torch.Tensor, index: list, columns: list) -> Axes:
     """Draw confusion matrix.
