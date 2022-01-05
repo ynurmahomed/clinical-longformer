@@ -1,6 +1,8 @@
 import torch
 import pandas as pd
 
+from typing import Tuple
+from torch import Tensor
 from torchmetrics.functional import precision_recall_curve
 from torchmetrics import Metric
 
@@ -26,25 +28,29 @@ class ClinicalBERTBinnedPRCurve(Metric):
         self.target = target
 
     def compute(self):
+        preds, target = per_admission_predictions(self.hadm_id, self.preds, self.target, c=self.c)
+        return precision_recall_curve(preds, target, pos_label=1)
 
-        df = pd.DataFrame(
-            {
-                "hadm_id": self.hadm_id.cpu().numpy(),
-                "preds": self.preds.cpu().numpy(),
-                "target": self.target.cpu().numpy(),
-            }
-        )
 
-        groupby = df.groupby("hadm_id")
+def per_admission_predictions(hadm_ids: Tensor, preds: Tensor, target: Tensor, c=2) -> Tuple[Tensor, Tensor]:
+    """ClinicalBERT per admission prediction scaling."""
 
-        p_max = groupby.preds.max()
-        p_mean = groupby.preds.mean()
-        n = groupby.preds.count()
+    df = pd.DataFrame(
+        {
+            "hadm_id": hadm_ids.cpu().numpy(),
+            "preds": preds.cpu().numpy(),
+            "target": target.cpu().numpy(),
+        }
+    )
 
-        p_readmit = (p_max + p_mean * n / self.c) / (1 + n / self.c)
+    groupby = df.groupby("hadm_id")
 
-        target = groupby.target.first()
+    p_max = groupby.preds.max()
+    p_mean = groupby.preds.mean()
+    n = groupby.preds.count()
 
-        return precision_recall_curve(
-            torch.tensor(p_readmit.values), torch.tensor(target.values), pos_label=1
-        )
+    p_readmit = (p_max + p_mean * n / c) / (1 + n / c)
+
+    target = groupby.target.first()
+
+    return torch.tensor(p_readmit.values), torch.tensor(target.values)
