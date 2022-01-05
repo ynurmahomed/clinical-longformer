@@ -12,7 +12,11 @@ from argparse import ArgumentParser
 from pathlib import Path
 from pytorch_lightning import seed_everything
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import LearningRateMonitor, EarlyStopping, ModelCheckpoint
+from pytorch_lightning.callbacks import (
+    LearningRateMonitor,
+    EarlyStopping,
+    ModelCheckpoint,
+)
 from transformers import (
     AdamW,
     AutoTokenizer,
@@ -20,10 +24,16 @@ from transformers import (
     SchedulerType,
     get_scheduler,
 )
-from torchmetrics import AveragePrecision, MetricCollection, Precision, Recall
+from torchmetrics import (
+    AveragePrecision,
+    MetricCollection,
+    Precision,
+    PrecisionRecallCurve,
+    Recall,
+)
 
 from ..data.module import TransformerMIMICIIIDataModule
-from .metrics import ClinicalBERTBinnedPRCurve
+from .metrics import per_admission_predictions
 from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix
 
 _logger = logging.getLogger(__name__)
@@ -76,7 +86,7 @@ class BertPretrainedModule(pl.LightningModule):
         self.bce_loss = nn.BCEWithLogitsLoss()
 
         # Metrics
-        pr_curve = ClinicalBERTBinnedPRCurve()
+        pr_curve = PrecisionRecallCurve()
         # Using separate metric collection as inputs for the following
         # are different
         metrics = MetricCollection([AveragePrecision(), Precision(), Recall()])
@@ -202,7 +212,9 @@ class BertPretrainedModule(pl.LightningModule):
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        precision, recall, _ = self.train_pr_curve(hadm_ids, preds, target)
+        preds, target = per_admission_predictions(hadm_ids, preds, target)
+
+        precision, recall, _ = self.train_pr_curve(preds, target)
 
         self.log("AUC-PR/train", auc_pr(precision, recall))
 
@@ -226,7 +238,9 @@ class BertPretrainedModule(pl.LightningModule):
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        precision, recall, _ = self.valid_pr_curve(hadm_ids, preds, target)
+        preds, target = per_admission_predictions(hadm_ids, preds, target)
+
+        precision, recall, _ = self.valid_pr_curve(preds, target)
 
         metrics = self.valid_metrics(preds, target.int())
 
@@ -258,7 +272,9 @@ class BertPretrainedModule(pl.LightningModule):
 
     def log_test_metrics(self, hadm_ids, preds, target):
 
-        precision, recall, _ = self.test_pr_curve(hadm_ids, preds, target)
+        preds, target = per_admission_predictions(hadm_ids, preds, target)
+
+        precision, recall, _ = self.test_pr_curve(preds, target)
 
         fig = plot_pr_curve(precision, recall)
 
