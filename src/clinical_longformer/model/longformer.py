@@ -4,8 +4,6 @@ import pytorch_lightning as pl
 import sys
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torchmetrics
 import wandb
 
 from argparse import ArgumentParser
@@ -386,6 +384,18 @@ def add_arguments():
         default=None,
     )
 
+    parser.add_argument(
+        "--do_train",
+        help="Whether to run the full optimization routine.",
+        action="store_true",
+    )
+
+    parser.add_argument(
+        "--do_test",
+        help="Whether to perform one evaluation epoch over the test set.",
+        action="store_true",
+    )
+
     parser = BertPretrainedModule.add_model_specific_args(parser)
 
     parser = pl.Trainer.add_argparse_args(parser)
@@ -468,10 +478,14 @@ def main(args):
 
     set_example_input_array(dm, model)
 
-    trainer.fit(model, datamodule=dm)
+    if args.do_train:
+        trainer.fit(model, datamodule=dm)
 
-    trainer.test(model, ckpt_path=None, datamodule=dm)
-
+    if args.do_test:
+        ckpt_path = None
+        if "resume_from_checkpoint" in args:
+            ckpt_path = args.resume_from_checkpoint
+        trainer.test(model, ckpt_path=ckpt_path, datamodule=dm)
 
 def run():
     # https://github.com/pytorch/pytorch/issues/11201
