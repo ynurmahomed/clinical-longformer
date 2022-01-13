@@ -15,14 +15,13 @@ from torchtext.vocab import GloVe
 from torchmetrics import (
     AveragePrecision,
     AUROC,
-    ConfusionMatrix,
     MetricCollection,
     PrecisionRecallCurve,
     ROC,
 )
 
 from ..data.module import MIMICIIIDataModule
-from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix, plot_roc_curve
+from .utils import auc_pr, plot_pr_curve, plot_roc_curve
 
 
 SEED = 42
@@ -83,9 +82,7 @@ class DAN(pl.LightningModule):
         self.valid_metrics.add_metrics([AveragePrecision(pos_label=1)])
 
         self.test_metrics = metrics.clone()
-        self.test_metrics.add_metrics(
-            [AUROC(pos_label=1), ROC(pos_label=1), ConfusionMatrix(2, normalize="true")]
-        )
+        self.test_metrics.add_metrics([AUROC(pos_label=1), ROC(pos_label=1)])
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -208,10 +205,6 @@ class DAN(pl.LightningModule):
 
         roc_curve = plot_roc_curve(fpr, tpr, metrics["AUROC"])
 
-        confmat = plot_confusion_matrix(
-            metrics["ConfusionMatrix"].cpu(), self.labels, self.labels
-        )
-
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
         self.log("AUC-ROC/test", metrics["AUROC"])
@@ -222,13 +215,6 @@ class DAN(pl.LightningModule):
 
         self.logger.experiment.log(
             {"ROC Curve/test": wandb.Image(roc_curve), "global_step": self.global_step}
-        )
-
-        self.logger.experiment.log(
-            {
-                "Confusion Matrix/test": wandb.Image(confmat),
-                "global_step": self.global_step,
-            }
         )
 
     def configure_optimizers(self):

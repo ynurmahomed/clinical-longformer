@@ -24,7 +24,6 @@ from transformers import (
 from torchmetrics import (
     AveragePrecision,
     AUROC,
-    ConfusionMatrix,
     MetricCollection,
     PrecisionRecallCurve,
     ROC,
@@ -34,7 +33,7 @@ from torchmetrics import (
 from ..data.module import TransformerMIMICIIIDataModule
 from .configuration_bert_long import BertLongConfig
 from .metrics import per_admission_predictions
-from .utils import auc_pr, plot_pr_curve, plot_confusion_matrix, plot_roc_curve
+from .utils import auc_pr, plot_pr_curve, plot_roc_curve
 from .modeling_bert_long import BertLongForSequenceClassification
 
 _logger = logging.getLogger(__name__)
@@ -101,9 +100,7 @@ class BertPretrainedModule(pl.LightningModule):
         self.valid_metrics.add_metrics([AveragePrecision(pos_label=1)])
 
         self.test_metrics = metrics.clone()
-        self.test_metrics.add_metrics(
-            [AUROC(pos_label=1), ROC(pos_label=1), ConfusionMatrix(2, normalize="true")]
-        )
+        self.test_metrics.add_metrics([AUROC(pos_label=1), ROC(pos_label=1)])
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -294,10 +291,6 @@ class BertPretrainedModule(pl.LightningModule):
 
         roc_curve = plot_roc_curve(fpr, tpr, metrics["AUROC"])
 
-        confmat = plot_confusion_matrix(
-            metrics["ConfusionMatrix"].cpu(), self.labels, self.labels
-        )
-
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
         self.log("AUC-ROC/test", metrics["AUROC"])
@@ -308,13 +301,6 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.logger.experiment.log(
             {"ROC Curve/test": wandb.Image(roc_curve), "global_step": self.global_step}
-        )
-
-        self.logger.experiment.log(
-            {
-                "Confusion Matrix/test": wandb.Image(confmat),
-                "global_step": self.global_step,
-            }
         )
 
     def configure_optimizers(self):
@@ -486,6 +472,7 @@ def main(args):
         if "resume_from_checkpoint" in args:
             ckpt_path = args.resume_from_checkpoint
         trainer.test(model, ckpt_path=ckpt_path, datamodule=dm)
+
 
 def run():
     # https://github.com/pytorch/pytorch/issues/11201
