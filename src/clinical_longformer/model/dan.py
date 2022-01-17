@@ -15,6 +15,7 @@ from torchtext.vocab import GloVe
 from torchmetrics import (
     AveragePrecision,
     AUROC,
+    BinnedRecallAtFixedPrecision,
     MetricCollection,
     PrecisionRecallCurve,
     ROC,
@@ -82,7 +83,15 @@ class DAN(pl.LightningModule):
         self.valid_metrics.add_metrics([AveragePrecision(pos_label=1)])
 
         self.test_metrics = metrics.clone()
-        self.test_metrics.add_metrics([AUROC(pos_label=1), ROC(pos_label=1)])
+        self.test_metrics.add_metrics(
+            [
+                AUROC(pos_label=1),
+                ROC(pos_label=1),
+                BinnedRecallAtFixedPrecision(
+                    num_classes=1, min_precision=0.8, thresholds=[0.5]
+                ),
+            ]
+        )
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -208,6 +217,8 @@ class DAN(pl.LightningModule):
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
         self.log("AUC-ROC/test", metrics["AUROC"])
+
+        self.log("RP80/test", metrics["BinnedRecallAtFixedPrecision"][0])
 
         self.logger.experiment.log(
             {"PR Curve/test": wandb.Image(pr_curve), "global_step": self.global_step}
