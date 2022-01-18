@@ -427,6 +427,7 @@ def main(args):
             check_on_train_epoch_end=False,
             verbose=True,
             mode="max",
+            patience=5,
         )
 
         callbacks.append(early_stopping)
