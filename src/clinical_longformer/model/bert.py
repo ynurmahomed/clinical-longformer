@@ -284,7 +284,7 @@ class BertPretrainedModule(pl.LightningModule):
 
         fpr, tpr, _ = metrics["ROC"]
 
-        roc_curve = plot_roc_curve(fpr, tpr, metrics["AUROC"])
+        roc_curve = plot_roc_curve(fpr.cpu(), tpr.cpu(), metrics["AUROC"])
 
         self.log("AUC-PR/test", auc_pr(precision, recall))
 
