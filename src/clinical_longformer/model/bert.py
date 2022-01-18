@@ -98,7 +98,9 @@ class BertPretrainedModule(pl.LightningModule):
                 AUROC(pos_label=1),
                 ROC(pos_label=1),
                 BinnedRecallAtFixedPrecision(
-                    num_classes=1, min_precision=0.8, thresholds=[0.5]
+                    num_classes=1,
+                    min_precision=0.8,
+                    thresholds=torch.tensor([0.5], device=self.device),
                 ),
             ]
         )
