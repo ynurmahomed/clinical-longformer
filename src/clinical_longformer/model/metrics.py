@@ -7,6 +7,8 @@ from torch import Tensor
 def per_admission_predictions(hadm_ids: Tensor, preds: Tensor, target: Tensor, c=2) -> Tuple[Tensor, Tensor]:
     """ClinicalBERT per admission prediction scaling."""
 
+    device = preds.device
+
     df = pd.DataFrame(
         {
             "hadm_id": hadm_ids.cpu().numpy(),
@@ -25,4 +27,4 @@ def per_admission_predictions(hadm_ids: Tensor, preds: Tensor, target: Tensor, c
 
     target = groupby.target.first()
 
-    return torch.tensor(p_readmit.values), torch.tensor(target.values)
+    return torch.tensor(p_readmit.values, device=device), torch.tensor(target.values, device=device)
