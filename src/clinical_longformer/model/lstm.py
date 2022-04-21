@@ -33,8 +33,7 @@ BATCH_SIZE = 64
 EMBED_DIM = 300
 DROPOUT = 5e-1
 
-FIXED_PRECISION = 0.8
-
+FIXED_PRECISION = 0.7
 
 class LSTMClassifier(pl.LightningModule):
     """Bi-LSTM with global max-pooling."""

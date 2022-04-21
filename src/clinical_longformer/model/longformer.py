@@ -47,7 +47,7 @@ LEARNING_RATE = 2e-5
 BATCH_SIZE = 16
 
 
-FIXED_PRECISION = 0.8
+FIXED_PRECISION = 0.7
 
 
 class BertPretrainedModule(pl.LightningModule):
