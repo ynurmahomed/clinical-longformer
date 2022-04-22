@@ -419,7 +419,7 @@ def split_all_notes(admissions, chunked, n_days, note_length, random_state=1):
     # exceed diff * note_length. Wont get perfect balance between positive and
     # negative because of varying length of notes.
     remaining = get_remaining_chunks_to_balance(
-        chunked, unused, note_length, diff, random_state
+        chunked, unused, diff, random_state
     )
     all_notes_train = pd.concat([remaining, all_notes_train])
 
