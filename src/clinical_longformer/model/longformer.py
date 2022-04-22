@@ -458,7 +458,7 @@ def main(args):
     callbacks.append(checkpoint_callback)
 
     name = args.run_name or "Longformer-" + str(args.max_length)
-    logger = WandbLogger(project="clinical-longformer", name=name, entity="yass")
+    logger = WandbLogger(name=name)
 
     logger.watch(model)
 

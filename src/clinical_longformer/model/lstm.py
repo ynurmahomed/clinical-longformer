@@ -322,7 +322,7 @@ def main(args):
     )
     callbacks.append(checkpoint_callback)
 
-    logger = WandbLogger(project="clinical-longformer", name="LSTM", entity="yass")
+    logger = WandbLogger(name="LSTM")
 
     logger.watch(model)
 
