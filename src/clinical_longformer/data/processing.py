@@ -1,11 +1,8 @@
 import logging
-import os
 import re
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 
 from pathlib import Path
 
@@ -438,7 +435,7 @@ def split_all_notes(admissions, chunked, n_days, note_length, random_state=1):
         f"readmitted={readmit*100:,.0f}% not_readmitted={not_readmit*100:,.0f}%"
     )
 
-    return all_notes_train, all_notes_val, all_notes_test
+    return all_notes_train.dropna(), all_notes_val.dropna(), all_notes_test.dropna()
 
 
 def process_notes(mimic_path, category, note_length, n_days, out_path):
