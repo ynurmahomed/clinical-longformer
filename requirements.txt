@@ -9,4 +9,4 @@ torch==1.9.0+cpu
 torchtext==0.10.0
 torchmetrics==0.6.2
 transformers==4.9.2
-wandb==0.12.2
+wandb==0.12.16
