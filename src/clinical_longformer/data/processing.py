@@ -365,7 +365,7 @@ def split_discharge_summaries(admissions, chunked, random_state=1):
     return discharge_train, discharge_val, discharge_test
 
 
-def split_all_notes(admissions, chunked, n_days, note_length, random_state=1):
+def split_all_notes(admissions, chunked, n_days, random_state=1):
     """Split chunked notes into training, validation and test sets.
 
     The training dataset will have balanced pos/neg examples.
@@ -374,7 +374,6 @@ def split_all_notes(admissions, chunked, n_days, note_length, random_state=1):
         admissions (pandas.Dataframe): Admissions dataframe
         chunked (pandas.Dataframe): Dataframe with chunked text
         n_days(int): Number of days of notes to collect.
-        note_length (int): Size of the chunks
         random_state (int, optional): Random state for sampling. Defaults to 1.
 
     Returns:
