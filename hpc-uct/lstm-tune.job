@@ -5,7 +5,7 @@
 #SBATCH --job-name="lstm-tune"
 #SBATCH --mail-user=nrmyas001@cs.uct.ac.za
 #SBATCH --mail-type=ALL
-#SBATCH --time=24:00:00
+#SBATCH --time=72:00:00
 
 module load software/TensorFlow-A100-GPU
 
@@ -14,6 +14,6 @@ export WANDB_DIR=/scratch/nrmyas001/
 
 cd /home/nrmyas001/clinical-longformer
 
-python3 /home/nrmyas001/.local/bin/wandb agent yass/clinical-longformer/hytmdz9b \
+python3 /home/nrmyas001/.local/bin/wandb agent yass/clinical-longformer/9kkopb6e \
     2>&1 | tee /scratch/nrmyas001/logs/lstm-tune/$(hostname)$(openssl rand -hex 4).out
 

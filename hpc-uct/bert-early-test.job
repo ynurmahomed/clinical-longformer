@@ -1,0 +1,33 @@
+#!/bin/sh
+#SBATCH --account=nlpgroup --partition=a100
+#SBATCH --nodes=1 --ntasks=6
+#SBATCH --gres=gpu:a100-3g-20gb:1
+#SBATCH --job-name="bert-early-test"
+#SBATCH --mail-user=nrmyas001@myuct.ac.za
+#SBATCH --mail-type=END,FAIL
+#SBATCH --time=12:00:00
+
+module load software/TensorFlow-A100-GPU
+
+export CUDA_VISIBLE_DEVICES=$(ncvd)
+export TOKENIZERS_PARALLELISM=false
+export WANDB_DIR=/scratch/nrmyas001
+export WANDB_ENTITY=yass
+export WANDB_PROJECT=clinical-longformer-early-test
+
+
+
+cd /home/nrmyas001/clinical-longformer-test
+
+for n in 1 2 3 4 5 6 7
+do
+export WANDB_NAME=BERT-$n-days
+python -m src.clinical_longformer.model.bert \
+    /scratch/nrmyas001/datasets/all7days/all/512/${n}days/ \
+    --do_test \
+    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12/512 \
+    --resume_from_checkpoint=/scratch/nrmyas001/data/model/BERT-early/AVG-Precision_valid=0.67-epoch=0-step=1436.ckpt \
+    --num_workers=6 \
+    --precision=16 \
+    --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/longf-test/$(hostname)$(openssl rand -hex 4).out
+done
