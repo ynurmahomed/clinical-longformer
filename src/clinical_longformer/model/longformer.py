@@ -5,6 +5,7 @@ import sys
 import torch
 import torch.nn as nn
 import wandb
+import pandas as pd
 
 from argparse import ArgumentParser
 from pathlib import Path
@@ -278,9 +279,33 @@ class BertPretrainedModule(pl.LightningModule):
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        self.log_test_metrics(hadm_ids, preds, target)
+        texts = torch.cat([o["text"]["input_ids"] for o in outputs])
+
+        self.log_test_metrics(hadm_ids, preds, target, texts)
+
 
     def log_test_metrics(self, hadm_ids, preds, target):
+
+        tokenizer = AutoTokenizer.from_pretrained(self.hparams.bert_pretrained_path)
+
+        decoded = []
+        tokenized = []
+        for ids in texts:
+            d = tokenizer.decode(ids)
+            decoded.append(d)
+            tokenized.append(" ".join(tokenizer.tokenize(d)))
+
+        df = pd.DataFrame(
+            {
+                "hadm_ids": hadm_ids,
+                "preds": torch.sigmoid(preds),
+                "target": target,
+                "text": decoded,
+                "tokenized": tokenized,
+            }
+        )
+
+        self.logger.log_table("test_table", dataframe=df)
 
         preds, target = per_admission_predictions(hadm_ids, preds, target)
 

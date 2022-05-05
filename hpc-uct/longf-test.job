@@ -1,0 +1,55 @@
+#!/bin/sh
+#SBATCH --account=nlpgroup --partition=a100
+#SBATCH --nodes=1 --ntasks=6
+#SBATCH --gres=gpu:a100-1g-5gb:1
+#SBATCH --job-name="longf-test"
+#SBATCH --mail-user=nrmyas001@myuct.ac.za
+#SBATCH --mail-type=END,FAIL
+#SBATCH --time=00:30:00
+
+module load software/TensorFlow-A100-GPU
+
+export CUDA_VISIBLE_DEVICES=$(ncvd)
+export TOKENIZERS_PARALLELISM=false
+export WANDB_DIR=/scratch/nrmyas001
+
+cd /home/nrmyas001/clinical-longformer
+
+python -m src.clinical_longformer.model.longformer \
+    /scratch/nrmyas001/datasets/discharge/1024 \
+    --do_test \
+    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/v2/bert_uncased_L-12_H-768_A-12-1024/1024/ \
+    --resume_from_checkpoint=/scratch/nrmyas001/data/model/Longformer-1024/AVG-Precision_valid=0.69-epoch=0-step=268.ckpt \
+    --max_length=1024 \
+    --attention_window=1024 \
+    --run_name=Longformer-1024 \
+    --num_workers=6 \
+    --precision=16 \
+    --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/longf-test/$(hostname)$(openssl rand -hex 4).out
+
+
+python -m src.clinical_longformer.model.longformer \
+    /scratch/nrmyas001/datasets/discharge/2048 \
+    --do_test \
+    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/v2/bert_uncased_L-12_H-768_A-12-2048/2048/ \
+    --resume_from_checkpoint=/scratch/nrmyas001/data/model/Longformer-2048/AVG-Precision_valid=0.72-epoch=6-step=1078.ckpt \
+    --attention_window=1024 \
+    --max_length=2048 \
+    --run_name=Longformer-2048 \
+    --num_workers=6 \
+    --precision=16 \
+    --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/longf-test/$(hostname)$(openssl rand -hex 4).out
+
+
+python -m src.clinical_longformer.model.longformer \
+    /scratch/nrmyas001/datasets/discharge/4096 \
+    --do_test \
+    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/v2/bert_uncased_L-12_H-768_A-12-4096/4096/ \
+    --resume_from_checkpoint=/scratch/nrmyas001/data/model/Longformer-4096/AVG-Precision_valid=0.71-epoch=5-step=708.ckpt \
+    --attention_window=1024 \
+    --max_length=4096 \
+    --run_name=Longformer-4096 \
+    --num_workers=6 \
+    --precision=16 \
+    --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/longf-test/$(hostname)$(openssl rand -hex 4).out
+
