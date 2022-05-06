@@ -269,7 +269,7 @@ class BertPretrainedModule(pl.LightningModule):
 
         preds = self(y, x).reshape(y.shape)
 
-        return {"hadm_id": hadm_id, "preds": preds, "target": y}
+        return {"hadm_id": hadm_id, "preds": preds, "target": y, "text": x}
 
     def test_epoch_end(self, outputs):
 
@@ -284,7 +284,7 @@ class BertPretrainedModule(pl.LightningModule):
         self.log_test_metrics(hadm_ids, preds, target, texts)
 
 
-    def log_test_metrics(self, hadm_ids, preds, target):
+    def log_test_metrics(self, hadm_ids, preds, target, texts):
 
         tokenizer = AutoTokenizer.from_pretrained(self.hparams.bert_pretrained_path)
 
@@ -297,9 +297,9 @@ class BertPretrainedModule(pl.LightningModule):
 
         df = pd.DataFrame(
             {
-                "hadm_ids": hadm_ids,
-                "preds": torch.sigmoid(preds),
-                "target": target,
+                "hadm_id": hadm_ids.cpu(),
+                "pred": torch.sigmoid(preds).cpu(),
+                "target": target.cpu(),
                 "text": decoded,
                 "tokenized": tokenized,
             }
