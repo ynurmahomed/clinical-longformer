@@ -15,7 +15,7 @@ export WANDB_DIR=/scratch/nrmyas001
 export WANDB_ENTITY=yass
 export WANDB_PROJECT=clinical-longformer-test
 
-cd /home/nrmyas001/clinical-longformer-test
+cd /home/nrmyas001/clinical-longformer
 
 for ckpt in /scratch/nrmyas001/data/model/Longformer-4096/AVG-Precision_valid=0.70-epoch=4-step=643.ckpt;
 do
