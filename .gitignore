@@ -66,3 +66,5 @@ lightning_logs
 ray_results
 
 wandb
+
+slurm-*
