@@ -44,7 +44,7 @@ class MIMICIIIDataModule(pl.LightningDataModule):
 
     def setup(self):
 
-        columns = ["LABEL", "TEXT"]
+        columns = ["HADM_ID", "LABEL", "TEXT"]
 
         self.labels = ["Not Readmitted", "Readmitted"]
 
@@ -79,9 +79,11 @@ class MIMICIIIDataModule(pl.LightningDataModule):
         return list(dataframe.itertuples(index=False))
 
     def collate_fn(self, batch):
-        label_list, text_list, offsets = [], [], [0]
+        hadm_ids, label_list, text_list, offsets = [], [], [], [0]
 
-        for (_label, _text) in batch:
+        for (_hadm_id, _label, _text) in batch:
+
+            hadm_ids.append(_hadm_id)
 
             label_list.append(self.label_transform(_label))
 
@@ -90,17 +92,19 @@ class MIMICIIIDataModule(pl.LightningDataModule):
             offsets.append(txt.size(0))
 
         return (
+            torch.tensor(hadm_ids),
             torch.tensor(label_list),
             torch.cat(text_list),
             torch.tensor(offsets[:-1]).cumsum(dim=0),
         )
 
     def collate_padded(self, batch):
-        label_list, text_list = [], []
-        for (_label, _text) in batch:
+        hadm_id_list, label_list, text_list = [], [], []
+        for (_hadm_id, _label, _text) in batch:
+            hadm_id_list.append(_hadm_id)
             label_list.append(self.label_transform(_label))
             text_list.append(self.text_transform(_text))
-        return torch.tensor(label_list), pad_sequence(text_list)
+        return torch.tensor(hadm_id_list), torch.tensor(label_list), pad_sequence(text_list)
 
     def get_dataloader(self, dataset, shuffle=False):
 

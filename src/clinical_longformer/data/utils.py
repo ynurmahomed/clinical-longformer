@@ -5,7 +5,7 @@ from torch.utils.data import Sampler
 
 class BatchRandomPooledSampler(Sampler):
     """A Sampler that batches examples with text of similar sizes together in order
-    to minimize padding. Examples should be in the form of tuples (label, text).
+    to minimize padding. Examples should be in the form of tuples with text as the last element. (*_, text).
     """
     def __init__(self, data_source, batch_size):
 
@@ -15,7 +15,7 @@ class BatchRandomPooledSampler(Sampler):
 
     def __iter__(self):
 
-        indices = [(i, len(s[1])) for i, s in enumerate(self.data_source)]
+        indices = [(i, len(s[-1])) for i, s in enumerate(self.data_source)]
 
         random.shuffle(indices)
 
