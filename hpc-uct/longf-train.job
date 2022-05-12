@@ -1,11 +1,11 @@
 #!/bin/sh
 #SBATCH --account=nlpgroup --partition=a100
 #SBATCH --nodes=1 --ntasks=6
-#SBATCH --gres=gpu:a100-4g-20gb:1
+#SBATCH --gres=gpu:ampere:1
 #SBATCH --job-name="longf-train"
-#SBATCH --mail-user=nrmyas001@cs.uct.ac.za
-#SBATCH --mail-type=ALL
-#SBATCH --time=03:00:00
+#SBATCH --mail-user=nrmyas001@myuct.ac.za
+#SBATCH --mail-type=END,FAIL
+#SBATCH --time=72:00:00
 
 module load software/TensorFlow-A100-GPU
 
@@ -15,21 +15,29 @@ export WANDB_DIR=/scratch/nrmyas001
 
 cd /home/nrmyas001/clinical-longformer
 
-for s in  2048
-do
-  for i in {1..5}
-  do
-  python -m src.clinical_longformer.model.longformer \
-      /scratch/nrmyas001/datasets/discharge/$s \
-      --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/bert_uncased_L-12_H-768_A-12-$s/$s \
-      --max_length=$s \
-      --checkpoint_callback=False \
-      --batch_size=2 \
-      --accumulate_grad_batches=16 \
-      --lr=3e-5 \
-      --max_epochs=3 \
-      --num_workers=6 \
-      --precision=16 \
-      --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/longf-train/$(hostname)$(openssl rand -hex 4).out
-  done
+l=2048
+d=0.2
+w=1024
+while true; do
+   python -m src.clinical_longformer.model.longformer \
+     /scratch/nrmyas001/datasets/discharge/$l \
+     --do_train \
+     --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/v2/bert_uncased_L-12_H-768_A-12-$l/$l/ \
+     --default_root_dir=/scratch/nrmyas001/data/model/Longformer-$l \
+     --max_length=$l \
+     --attention_window=$w \
+     --attention_probs_dropout_prob=$d \
+     --hidden_dropout_prob=$d \
+     --run_name=Longformer-$l \
+     --batch_size=4 \
+     --accumulate_grad_batches=8 \
+     --lr=3e-5 \
+     --lr_scheduler_type=linear \
+     --warmup_proportion=0.1 \
+     --max_epochs=10 \
+     --num_workers=6 \
+     --precision=16 \
+     --stopping_threshold=0.80 \
+     --val_check_interval=0.5 \
+     --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/longf-train/$(hostname)$(openssl rand -hex 4).out
 done

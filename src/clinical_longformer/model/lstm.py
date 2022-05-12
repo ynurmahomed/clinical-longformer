@@ -322,7 +322,7 @@ def main(args):
     )
     callbacks.append(checkpoint_callback)
 
-    logger = WandbLogger(name="LSTM")
+    logger = WandbLogger()
 
     logger.watch(model)
 

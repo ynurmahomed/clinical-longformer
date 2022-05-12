@@ -1,0 +1,35 @@
+#!/bin/sh
+#SBATCH --account=nlpgroup --partition=a100
+#SBATCH --nodes=1 --ntasks=6
+#SBATCH --gres=gpu:a100-3g-20gb:1
+#SBATCH --job-name="longf-early-test"
+#SBATCH --mail-user=nrmyas001@myuct.ac.za
+#SBATCH --mail-type=END,FAIL
+#SBATCH --time=04:00:00
+
+module load software/TensorFlow-A100-GPU
+
+export CUDA_VISIBLE_DEVICES=$(ncvd)
+export TOKENIZERS_PARALLELISM=false
+export WANDB_DIR=/scratch/nrmyas001
+export WANDB_ENTITY=yass
+export WANDB_PROJECT=clinical-longformer-early-test
+
+
+
+cd /home/nrmyas001/clinical-longformer-test
+
+for n in 1 2
+do
+python -m src.clinical_longformer.model.longformer \
+    /scratch/nrmyas001/datasets/all7days/all/4096/${n}days/ \
+    --do_test \
+    --bert_pretrained_path=/scratch/nrmyas001/data/pretraining_output/v2/bert_uncased_L-12_H-768_A-12-4096/4096/ \
+    --resume_from_checkpoint=/scratch/nrmyas001/data/model/Longformer-early-4096/AVG-Precision_valid=0.66-epoch=2-step=5966.ckpt \
+    --attention_window=1024 \
+    --max_length=4096 \
+    --run_name=Longformer-4096-$n-days \
+    --num_workers=6 \
+    --precision=16 \
+    --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/longf-test/$(hostname)$(openssl rand -hex 4).out
+done

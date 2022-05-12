@@ -14,5 +14,5 @@ export WANDB_DIR=/scratch/nrmyas001/
 
 cd /home/nrmyas001/clinical-longformer
 
-python3 /home/nrmyas001/.local/bin/wandb agent yass/clinical-longformer/q7f4tgrr \
+python3 /home/nrmyas001/.local/bin/wandb agent yass/clinical-longformer/mc963pet \
     2>&1 | tee /scratch/nrmyas001/logs/dan-tune/$(hostname)$(openssl rand -hex 4).out 

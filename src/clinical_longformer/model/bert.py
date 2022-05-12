@@ -309,7 +309,7 @@ class BertPretrainedModule(pl.LightningModule):
 
 def get_data_module(mimic_path, bert_pretrained_path, batch_size, num_workers):
     p = Path(mimic_path)
-    tokenizer = AutoTokenizer.from_pretrained(bert_pretrained_path)
+    tokenizer = AutoTokenizer.from_pretrained(bert_pretrained_path, model_max_length=512)
     dm = TransformerMIMICIIIDataModule(p, batch_size, tokenizer, num_workers)
     dm.setup()
     return dm

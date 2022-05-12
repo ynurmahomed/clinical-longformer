@@ -2,30 +2,21 @@
 #SBATCH --account=nlpgroup --partition=a100
 #SBATCH --nodes=1 --ntasks=6
 #SBATCH --gres=gpu:a100-1g-5gb:1
-#SBATCH --job-name="dan-train"
+#SBATCH --job-name="dan-test"
 #SBATCH --mail-user=nrmyas001@cs.uct.ac.za
 #SBATCH --mail-type=ALL
-#SBATCH --time=00:10:00
+#SBATCH --time=00:05:00
 
 module load software/TensorFlow-A100-GPU
 
 export CUDA_VISIBLE_DEVICES=$(ncvd)
 export WANDB_DIR=/scratch/nrmyas001/wandb
 
-for i in {1}
-do
-python -m src.clinical_longformer.model.dan  \
+python -m src.clinical_longformer.model.dan \
     /scratch/nrmyas001/datasets/discharge/-1 \
-    --do_train \
+    --do_test \
+    --embed_dim=300 \
+    --resume_from_checkpoint=/scratch/nrmyas001/data/model/DAN/AVG-Precision_valid=0.61-epoch=6-step=559.ckpt \
     --vectors_root=/scratch/nrmyas001/data \
-    --default_root_dir=/scratch/nrmyas001/data/model/DAN \
-    --batch_size=64 \
-    --embed_dim=100 \
-    --lr=7e-4 \
-    --num_hidden=2 \
-    --p=0.6 \
-    --weight_decay=1e-2 \
-    --max_epochs=10 \
     --num_workers=6 \
     --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/dan-train/$(hostname)$(openssl rand -hex 4).out
-done

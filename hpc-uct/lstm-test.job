@@ -2,26 +2,23 @@
 #SBATCH --account=nlpgroup --partition=a100
 #SBATCH --nodes=1 --ntasks=6
 #SBATCH --gres=gpu:a100-2g-10gb:1
-#SBATCH --job-name="lstm-train"
+#SBATCH --job-name="lstm-test"
 #SBATCH --mail-user=nrmyas001@cs.uct.ac.za
 #SBATCH --mail-type=ALL
-#SBATCH --time=01:00:00
+#SBATCH --time=00:10:00
 
 module load software/TensorFlow-A100-GPU
 
 export CUDA_VISIBLE_DEVICES=$(ncvd)
 export WANDB_DIR=/scratch/nrmyas001/wandb
 
-for d in 0.1 0.2 0.3
-do
 python -m src.clinical_longformer.model.lstm  \
     /scratch/nrmyas001/datasets/discharge/-1 \
-    --do_train \
+    --do_test \
+    --embed_dim=300 \
+    --hidden_dim=200 \
+    --resume_from_checkpoint=/scratch/nrmyas001/data/model/LSTM/AVG-Precision_valid=0.68-epoch=8-step=557.ckpt \
     --vectors_root=/scratch/nrmyas001/data \
-    --default_root_dir=/scratch/nrmyas001/data/model/LSTM \
-    --max_epochs=10 \
-    --dropout=$d \
     --num_workers=6 \
     --precision=16 \
-    --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/lstm-train/$(hostname)$(openssl rand -hex 4).out
-done
+    --gpus=1 2>&1 | tee /scratch/nrmyas001/logs/lstm-test/$(hostname)$(openssl rand -hex 4).out
