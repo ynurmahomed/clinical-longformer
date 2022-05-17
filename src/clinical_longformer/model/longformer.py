@@ -306,9 +306,9 @@ class BertPretrainedModule(pl.LightningModule):
 
         groupby = df.groupby("hadm_id")
 
-        p_max = groupby.preds.max()
-        p_mean = groupby.preds.mean()
-        n = groupby.preds.count()
+        p_max = groupby.pred.max()
+        p_mean = groupby.pred.mean()
+        n = groupby.pred.count()
 
         p_readmit = get_p_readmit(p_max, p_mean, n)
         p_readmit = p_readmit.reset_index()
