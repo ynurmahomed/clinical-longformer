@@ -13,6 +13,7 @@ from pathlib import Path
 from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
+from torch.nn.utils.rnn import pad_sequence
 from torchtext.vocab import GloVe
 from torchmetrics import (
     AveragePrecision,
@@ -191,7 +192,9 @@ class LSTMClassifier(pl.LightningModule):
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        texts = torch.cat([o["text"] for o in outputs], dim=1)
+        texts = pad_sequence([o["text"] for o in outputs])
+
+        texts = torch.reshape(texts, (texts.size(0), texts.size(1) * texts.size(2)))
 
         self.log_test_metrics(hadm_ids, preds, target, texts)
 
