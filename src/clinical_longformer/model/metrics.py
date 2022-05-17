@@ -6,7 +6,7 @@ from torch import Tensor
 
 
 def per_admission_predictions(
-    hadm_ids: Tensor, preds: Tensor, target: Tensor, c=None
+    hadm_ids: Tensor, preds: Tensor, target: Tensor
 ) -> Tuple[Tensor, Tensor]:
     """ClinicalBERT per admission prediction scaling."""
 
@@ -26,7 +26,7 @@ def per_admission_predictions(
     p_mean = groupby.preds.mean()
     n = groupby.preds.count()
 
-    p_readmit = get_p_readmit(p_max, p_mean, n, c)
+    p_readmit = get_p_readmit(p_max, p_mean, n)
 
     target = groupby.target.first()
 
