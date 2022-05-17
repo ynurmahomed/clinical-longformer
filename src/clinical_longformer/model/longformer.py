@@ -283,7 +283,6 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.log_test_metrics(hadm_ids, preds, target, texts)
 
-
     def log_test_metrics(self, hadm_ids, preds, target, texts):
 
         tokenizer = AutoTokenizer.from_pretrained(self.hparams.bert_pretrained_path)
@@ -312,6 +311,8 @@ class BertPretrainedModule(pl.LightningModule):
         n = groupby.preds.count()
 
         p_readmit = get_p_readmit(p_max, p_mean, n)
+        p_readmit = p_readmit.reset_index()
+        p_readmit = p_readmit.rename(columns={"pred": "p_readmit"})
 
         merge = pd.merge(df, p_readmit, on="hadm_id")
 
