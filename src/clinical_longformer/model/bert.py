@@ -1,5 +1,6 @@
 import logging
 import os
+import pandas as pd
 import pytorch_lightning as pl
 import sys
 import torch
@@ -31,7 +32,7 @@ from torchmetrics import (
 )
 
 from ..data.module import TransformerMIMICIIIDataModule
-from .metrics import per_admission_predictions
+from .metrics import get_p_readmit, per_admission_predictions
 from .utils import auc_pr, plot_pr_curve, plot_roc_curve
 
 _logger = logging.getLogger(__name__)
@@ -252,7 +253,7 @@ class BertPretrainedModule(pl.LightningModule):
 
         preds = self(y, x).reshape(y.shape)
 
-        return {"hadm_id": hadm_id, "preds": preds, "target": y}
+        return {"hadm_id": hadm_id, "preds": preds, "target": y, "text": x}
 
     def test_epoch_end(self, outputs):
 
@@ -262,9 +263,44 @@ class BertPretrainedModule(pl.LightningModule):
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        self.log_test_metrics(hadm_ids, preds, target)
+        texts = torch.cat([o["text"]["input_ids"] for o in outputs])
 
-    def log_test_metrics(self, hadm_ids, preds, target):
+        self.log_test_metrics(hadm_ids, preds, target, texts)
+
+    def log_test_metrics(self, hadm_ids, preds, target, texts):
+
+        tokenizer = AutoTokenizer.from_pretrained(self.hparams.bert_pretrained_path)
+
+        decoded = []
+        tokenized = []
+        for ids in texts:
+            d = tokenizer.decode(ids)
+            decoded.append(d)
+            tokenized.append(" ".join(tokenizer.tokenize(d)))
+
+        df = pd.DataFrame(
+            {
+                "hadm_id": hadm_ids.cpu(),
+                "pred": torch.sigmoid(preds).cpu(),
+                "target": target.cpu(),
+                "text": decoded,
+                "tokenized": tokenized,
+            }
+        )
+
+        groupby = df.groupby("hadm_id")
+
+        p_max = groupby.pred.max()
+        p_mean = groupby.pred.mean()
+        n = groupby.pred.count()
+
+        p_readmit = get_p_readmit(p_max, p_mean, n)
+        p_readmit = p_readmit.reset_index()
+        p_readmit = p_readmit.rename(columns={"pred": "p_readmit"})
+
+        merge = pd.merge(df, p_readmit, on="hadm_id")
+
+        self.logger.log_table("test_table", dataframe=merge)
 
         preds, target = per_admission_predictions(hadm_ids, preds, target)
 
