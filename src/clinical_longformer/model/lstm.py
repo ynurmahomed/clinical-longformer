@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 import pytorch_lightning as pl
 import sys
 import torch
@@ -12,6 +13,7 @@ from pathlib import Path
 from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
+from torch.nn.utils.rnn import pad_sequence
 from torchtext.vocab import GloVe
 from torchmetrics import (
     AveragePrecision,
@@ -41,6 +43,7 @@ class LSTMClassifier(pl.LightningModule):
     def __init__(self, vectors, vocab, labels, hparams):
         super().__init__()
 
+        self.vocab = vocab
         self.labels = labels
 
         self.save_hyperparameters(hparams, ignore=["vectors", "vocab", "labels"])
@@ -49,7 +52,7 @@ class LSTMClassifier(pl.LightningModule):
             pre_trained = vectors.get_vecs_by_tokens(list(vocab.get_stoi()))
             self.embedding = nn.Embedding.from_pretrained(pre_trained)
         else:
-            self.embedding = nn.Embedding(len(vocab), self.hparams.embed_dim)
+            self.embedding = nn.Embedding(180321, self.hparams.embed_dim)
 
         self.lstm = nn.LSTM(
             hparams["embed_dim"],
@@ -123,7 +126,7 @@ class LSTMClassifier(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        y, x = batch
+        _, y, x = batch
 
         preds = self(x).view(-1)
 
@@ -147,7 +150,7 @@ class LSTMClassifier(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        y, x = batch
+        _, y, x = batch
 
         preds = self(x).view(-1)
 
@@ -173,23 +176,44 @@ class LSTMClassifier(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
 
-        y, x = batch
+        hadm_id, y, x = batch
 
         preds = self(x).view(-1)
 
         loss = self.bce_loss(preds, y)
 
-        return {"preds": preds.detach(), "target": y}
+        return {"preds": preds.detach(), "target": y, "text": x, "hadm_id": hadm_id}
 
     def test_epoch_end(self, outputs):
+       
+        hadm_ids = torch.cat([o["hadm_id"] for o in outputs])
 
         target = torch.cat([o["target"] for o in outputs])
 
         preds = torch.cat([o["preds"] for o in outputs])
 
-        self.log_test_metrics(preds, target)
+        texts = pad_sequence([o["text"] for o in outputs])
 
-    def log_test_metrics(self, preds, target):
+        texts = torch.reshape(texts, (texts.size(0), texts.size(1) * texts.size(2)))
+
+        self.log_test_metrics(hadm_ids, preds, target, texts)
+
+    def log_test_metrics(self, hadm_ids, preds, target, texts):
+
+        txt = texts.cpu().T.tolist()
+
+        itos = self.vocab.get_itos()
+
+        df = pd.DataFrame(
+            {
+                "hadm_id": hadm_ids.cpu(),
+                "pred": torch.sigmoid(preds).cpu(),
+                "target": target.cpu(),
+                "text": [" ".join([itos[j] for j in i]) for i in txt],
+            }
+        )
+
+        self.logger.log_table("test_table", dataframe=df)
 
         metrics = self.test_metrics(preds, target.int())
 
@@ -231,7 +255,7 @@ def get_vectors(dim, cache):
 
 
 def set_example_input_array(datamodule, model):
-    _, x = next(iter(datamodule.train_dataloader()))
+    (*_, x) = next(iter(datamodule.train_dataloader()))
     model.example_input_array = x
 
 

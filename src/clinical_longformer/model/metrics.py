@@ -4,7 +4,10 @@ import pandas as pd
 from typing import Tuple
 from torch import Tensor
 
-def per_admission_predictions(hadm_ids: Tensor, preds: Tensor, target: Tensor, c=2) -> Tuple[Tensor, Tensor]:
+
+def per_admission_predictions(
+    hadm_ids: Tensor, preds: Tensor, target: Tensor
+) -> Tuple[Tensor, Tensor]:
     """ClinicalBERT per admission prediction scaling."""
 
     device = preds.device
@@ -23,8 +26,14 @@ def per_admission_predictions(hadm_ids: Tensor, preds: Tensor, target: Tensor, c
     p_mean = groupby.preds.mean()
     n = groupby.preds.count()
 
-    p_readmit = (p_max + p_mean * n / c) / (1 + n / c)
+    p_readmit = get_p_readmit(p_max, p_mean, n)
 
     target = groupby.target.first()
 
-    return torch.tensor(p_readmit.values, device=device), torch.tensor(target.values, device=device)
+    return torch.tensor(p_readmit.values, device=device), torch.tensor(
+        target.values, device=device
+    )
+
+
+def get_p_readmit(p_max, p_mean, n, c=2):
+    return (p_max + p_mean * n / c) / (1 + n / c)

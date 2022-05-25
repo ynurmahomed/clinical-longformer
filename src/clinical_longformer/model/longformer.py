@@ -33,7 +33,7 @@ from torchmetrics import (
 
 from ..data.module import TransformerMIMICIIIDataModule
 from .configuration_bert_long import BertLongConfig
-from .metrics import per_admission_predictions
+from .metrics import get_p_readmit, per_admission_predictions
 from .utils import auc_pr, plot_pr_curve, plot_roc_curve
 from .modeling_bert_long import BertLongForSequenceClassification
 
@@ -283,7 +283,6 @@ class BertPretrainedModule(pl.LightningModule):
 
         self.log_test_metrics(hadm_ids, preds, target, texts)
 
-
     def log_test_metrics(self, hadm_ids, preds, target, texts):
 
         tokenizer = AutoTokenizer.from_pretrained(self.hparams.bert_pretrained_path)
@@ -305,7 +304,19 @@ class BertPretrainedModule(pl.LightningModule):
             }
         )
 
-        self.logger.log_table("test_table", dataframe=df)
+        groupby = df.groupby("hadm_id")
+
+        p_max = groupby.pred.max()
+        p_mean = groupby.pred.mean()
+        n = groupby.pred.count()
+
+        p_readmit = get_p_readmit(p_max, p_mean, n)
+        p_readmit = p_readmit.reset_index()
+        p_readmit = p_readmit.rename(columns={"pred": "p_readmit"})
+
+        merge = pd.merge(df, p_readmit, on="hadm_id")
+
+        self.logger.log_table("test_table", dataframe=merge)
 
         preds, target = per_admission_predictions(hadm_ids, preds, target)
 

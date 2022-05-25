@@ -131,7 +131,7 @@ class DAN(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        y, x, offsets = batch
+        _, y, x, offsets = batch
 
         preds = self(x, offsets).view(-1)
 
@@ -155,7 +155,7 @@ class DAN(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        y, x, offsets = batch
+        _, y, x, offsets = batch
 
         preds = self(x, offsets).view(-1)
 
@@ -181,7 +181,7 @@ class DAN(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
 
-        y, x, offsets = batch
+        _, y, x, offsets = batch
 
         preds = self(x, offsets).view(-1)
 
@@ -241,7 +241,7 @@ def get_vectors(dim, cache):
 
 
 def set_example_input_array(datamodule, model):
-    _, x, offsets = next(iter(datamodule.train_dataloader()))
+    (*_, x, offsets) = next(iter(datamodule.train_dataloader()))
     model.example_input_array = [x, offsets]
 
 
