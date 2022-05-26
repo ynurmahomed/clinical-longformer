@@ -316,7 +316,7 @@ class BertPretrainedModule(pl.LightningModule):
 
         merge = pd.merge(df, p_readmit, on="hadm_id")
 
-        self.logger.log_table("test_table", dataframe=merge)
+        self.logger.log_table("longf_table", dataframe=merge)
 
         preds, target = per_admission_predictions(hadm_ids, preds, target)
 

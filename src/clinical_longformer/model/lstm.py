@@ -213,7 +213,7 @@ class LSTMClassifier(pl.LightningModule):
             }
         )
 
-        self.logger.log_table("test_table", dataframe=df)
+        self.logger.log_table("lstm_table", dataframe=df)
 
         metrics = self.test_metrics(preds, target.int())
 
