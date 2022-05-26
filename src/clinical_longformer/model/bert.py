@@ -265,9 +265,11 @@ class BertPretrainedModule(pl.LightningModule):
 
         texts = torch.cat([o["text"]["input_ids"] for o in outputs])
 
-        self.log_test_metrics(hadm_ids, preds, target, texts)
+        self.log_run_table(hadm_ids, preds, target, texts)
 
-    def log_test_metrics(self, hadm_ids, preds, target, texts):
+        self.log_test_metrics(hadm_ids, preds, target)
+
+    def log_run_table(self, hadm_ids, preds, target, texts):
 
         tokenizer = AutoTokenizer.from_pretrained(self.hparams.bert_pretrained_path)
 
@@ -301,6 +303,8 @@ class BertPretrainedModule(pl.LightningModule):
         merge = pd.merge(df, p_readmit, on="hadm_id")
 
         self.logger.log_table("bert_table", dataframe=merge)
+
+    def log_test_metrics(self, hadm_ids, preds, target):
 
         preds, target = per_admission_predictions(hadm_ids, preds, target)
 
@@ -345,7 +349,9 @@ class BertPretrainedModule(pl.LightningModule):
 
 def get_data_module(mimic_path, bert_pretrained_path, batch_size, num_workers):
     p = Path(mimic_path)
-    tokenizer = AutoTokenizer.from_pretrained(bert_pretrained_path, model_max_length=512)
+    tokenizer = AutoTokenizer.from_pretrained(
+        bert_pretrained_path, model_max_length=512
+    )
     dm = TransformerMIMICIIIDataModule(p, batch_size, tokenizer, num_workers)
     dm.setup()
     return dm

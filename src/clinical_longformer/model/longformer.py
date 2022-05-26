@@ -281,10 +281,11 @@ class BertPretrainedModule(pl.LightningModule):
 
         texts = torch.cat([o["text"]["input_ids"] for o in outputs])
 
-        self.log_test_metrics(hadm_ids, preds, target, texts)
+        self.log_run_table(hadm_ids, preds, target, texts)
 
-    def log_test_metrics(self, hadm_ids, preds, target, texts):
+        self.log_test_metrics(hadm_ids, preds, target)
 
+    def log_run_table(self, hadm_ids, preds, target, texts):
         tokenizer = AutoTokenizer.from_pretrained(self.hparams.bert_pretrained_path)
 
         decoded = []
@@ -317,6 +318,8 @@ class BertPretrainedModule(pl.LightningModule):
         merge = pd.merge(df, p_readmit, on="hadm_id")
 
         self.logger.log_table("longf_table", dataframe=merge)
+
+    def log_test_metrics(self, hadm_ids, preds, target):
 
         preds, target = per_admission_predictions(hadm_ids, preds, target)
 

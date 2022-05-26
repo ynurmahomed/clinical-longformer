@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 import pytorch_lightning as pl
 import sys
 import torch
@@ -181,19 +182,35 @@ class DAN(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
 
-        _, y, x, offsets = batch
+        hadm_id, y, x, offsets = batch
 
         preds = self(x, offsets).view(-1)
 
-        return {"preds": preds, "target": y}
+        return {"preds": preds, "target": y, "hadm_id": hadm_id}
 
     def test_epoch_end(self, outputs):
+
+        hadm_ids = torch.cat([o["hadm_id"] for o in outputs])
 
         target = torch.cat([o["target"] for o in outputs])
 
         preds = torch.cat([o["preds"] for o in outputs])
 
+        self.log_run_table(hadm_ids, preds, target)
+
         self.log_test_metrics(preds, target)
+
+    def log_run_table(self, hadm_ids, preds, target):
+
+        df = pd.DataFrame(
+            {
+                "hadm_id": hadm_ids.cpu(),
+                "pred": torch.sigmoid(preds).cpu(),
+                "target": target.cpu(),
+            }
+        )
+
+        self.logger.log_table("test_table", dataframe=df)
 
     def log_test_metrics(self, preds, target):
 

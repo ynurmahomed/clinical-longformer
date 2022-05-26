@@ -37,6 +37,7 @@ DROPOUT = 5e-1
 
 FIXED_PRECISION = 0.7
 
+
 class LSTMClassifier(pl.LightningModule):
     """Bi-LSTM with global max-pooling."""
 
@@ -185,7 +186,7 @@ class LSTMClassifier(pl.LightningModule):
         return {"preds": preds.detach(), "target": y, "text": x, "hadm_id": hadm_id}
 
     def test_epoch_end(self, outputs):
-       
+
         hadm_ids = torch.cat([o["hadm_id"] for o in outputs])
 
         target = torch.cat([o["target"] for o in outputs])
@@ -196,9 +197,11 @@ class LSTMClassifier(pl.LightningModule):
 
         texts = torch.reshape(texts, (texts.size(0), texts.size(1) * texts.size(2)))
 
-        self.log_test_metrics(hadm_ids, preds, target, texts)
+        self.log_run_table(hadm_ids, preds, target, texts)
 
-    def log_test_metrics(self, hadm_ids, preds, target, texts):
+        self.log_test_metrics(preds, target)
+
+    def log_run_table(self, hadm_ids, preds, target, texts):
 
         txt = texts.cpu().T.tolist()
 
@@ -214,6 +217,8 @@ class LSTMClassifier(pl.LightningModule):
         )
 
         self.logger.log_table("lstm_table", dataframe=df)
+
+    def log_test_metrics(self, preds, target):
 
         metrics = self.test_metrics(preds, target.int())
 
