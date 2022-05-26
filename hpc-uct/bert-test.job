@@ -14,6 +14,7 @@ export TOKENIZERS_PARALLELISM=false
 export WANDB_DIR=/scratch/nrmyas001
 export WANDB_ENTITY=yass
 export WANDB_PROJECT=clinical-longformer-test
+export WANDB_NAME=BERT
 
 cd /home/nrmyas001/clinical-longformer-test
 

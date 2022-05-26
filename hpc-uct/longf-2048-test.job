@@ -5,7 +5,7 @@
 #SBATCH --job-name="longf-2048-test"
 #SBATCH --mail-user=nrmyas001@myuct.ac.za
 #SBATCH --mail-type=END,FAIL
-#SBATCH --time=00:20:00
+#SBATCH --time=00:10:00
 
 module load software/TensorFlow-A100-GPU
 
@@ -17,7 +17,7 @@ export WANDB_PROJECT=clinical-longformer-test
 
 cd /home/nrmyas001/clinical-longformer-test
 
-for ckpt in $(find /scratch/nrmyas001/data/model/Longformer-2048 -mindepth 1 -mtime -1 -printf "%p ");
+for ckpt in $(ls /scratch/nrmyas001/data/model/Longformer-2048/AVG-Precision_valid=0.62-epoch=0-step=165.ckpt);
 do
   python -m src.clinical_longformer.model.longformer \
       /scratch/nrmyas001/datasets/discharge/2048 \

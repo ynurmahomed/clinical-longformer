@@ -11,6 +11,9 @@ module load software/TensorFlow-A100-GPU
 
 export CUDA_VISIBLE_DEVICES=$(ncvd)
 export WANDB_DIR=/scratch/nrmyas001/wandb
+export WANDB_ENTITY=yass
+export WANDB_PROJECT=clinical-longformer-test
+export WANDB_NAME=DAN
 
 python -m src.clinical_longformer.model.dan \
     /scratch/nrmyas001/datasets/discharge/-1 \

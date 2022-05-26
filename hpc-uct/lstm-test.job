@@ -1,16 +1,19 @@
 #!/bin/sh
 #SBATCH --account=nlpgroup --partition=a100
 #SBATCH --nodes=1 --ntasks=6
-#SBATCH --gres=gpu:a100-2g-10gb:1
+#SBATCH --gres=gpu:a100-1g-5gb:1
 #SBATCH --job-name="lstm-test"
 #SBATCH --mail-user=nrmyas001@cs.uct.ac.za
 #SBATCH --mail-type=ALL
-#SBATCH --time=00:10:00
+#SBATCH --time=00:01:00
 
 module load software/TensorFlow-A100-GPU
 
 export CUDA_VISIBLE_DEVICES=$(ncvd)
 export WANDB_DIR=/scratch/nrmyas001/wandb
+export WANDB_ENTITY=yass
+export WANDB_PROJECT=clinical-longformer-test
+export WANDB_NAME=LSTM
 
 python -m src.clinical_longformer.model.lstm  \
     /scratch/nrmyas001/datasets/discharge/-1 \
