@@ -39,4 +39,5 @@ class BatchRandomPooledSampler(Sampler):
         return iter(batches)
 
     def __len__(self):
+        # Will ignore last batch if not batch_size!
         return len(self.data_source) // self.batch_size
