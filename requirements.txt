@@ -4,6 +4,7 @@ pytest==6.2.4
 pytorch-lightning==1.5.7
 seaborn==0.11.2
 scikit-learn==1.1.1
+tikzplotlib==0.10.1
 torch==1.9.0+cpu
 torchtext==0.10.0
 torchmetrics==0.6.2

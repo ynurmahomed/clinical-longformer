@@ -161,7 +161,7 @@ def read_admissions(mimic_path):
     Returns:
         pandas.Dataframe: Admissions dataframe
     """
-    admissions = Path(mimic_path) / "ADMISSIONS.csv"
+    admissions = Path(mimic_path) / "ADMISSIONS.csv.gz"
     columns = [
         "SUBJECT_ID",
         "HADM_ID",
@@ -173,7 +173,7 @@ def read_admissions(mimic_path):
     dtypes = {"ADMISSION_TYPE": "category"}
     dates = ["ADMITTIME", "DISCHTIME", "DEATHTIME"]
     return (
-        pd.read_csv(admissions, usecols=columns, dtype=dtypes, parse_dates=dates)
+        pd.read_csv(admissions, compression='gzip', usecols=columns, dtype=dtypes, parse_dates=dates)
         .pipe(sort, ["SUBJECT_ID", "ADMITTIME"])
         .pipe(filter_newborn)
         .pipe(filter_death)
@@ -193,11 +193,11 @@ def read_notes(mimic_path):
     Returns:
         pandas.Dataframe: Note events dataframe
     """
-    notes = Path(mimic_path) / "NOTEEVENTS.csv"
+    notes = Path(mimic_path) / "NOTEEVENTS.csv.gz"
     columns = ["SUBJECT_ID", "HADM_ID", "CHARTDATE", "TEXT", "CATEGORY"]
     dtypes = {"CATEGORY": "category"}
     return pd.read_csv(
-        notes, usecols=columns, dtype=dtypes, parse_dates=["CHARTDATE"]
+        notes, usecols=columns, compression='gzip', dtype=dtypes, parse_dates=["CHARTDATE"]
     ).pipe(sort, ["SUBJECT_ID", "HADM_ID", "CHARTDATE"])
 
 
