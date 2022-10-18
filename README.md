@@ -17,7 +17,9 @@ Setup
 
 1. Install the dependencies with:
 
-    pip3 install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+```
+pip3 install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+```
 
 If you plan on using GPUS use the `reqirements-hpc.txt` files instead.
 
