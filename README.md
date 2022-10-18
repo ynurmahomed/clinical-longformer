@@ -1,7 +1,7 @@
 clinical-longformer
 ===================
 
-This is the source code for the Master's thesis project "Hospital readmission prediction with long clinical notes".
+This is the source code for the Master's thesis project "Hospital readmission prediction with long clinical notes", presented in partial fulfilment of the requirements for the degree of MSc in Computer Science in the University of Cape Town.
 
 Description
 ===========
